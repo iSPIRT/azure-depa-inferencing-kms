@@ -2,13 +2,7 @@ services:
 
   ccf-sandbox:
     build:
-      dockerfile_inline: |
-        FROM ghcr.io/microsoft/ccf/app/dev/virtual:${CCF_VERSION}
-        RUN python3 -m venv .venv_ccf_sandbox && \
-          . .venv_ccf_sandbox/bin/activate && \
-          pip install -U -q pip && \
-          pip install -q -U "ccf==$(sed 's/^ccf-//' "/opt/ccf_virtual/share/VERSION_LONG")" && \
-          pip install -q -U -r "/opt/ccf_virtual/bin/requirements.txt"
+      dockerfile: Dockerfile.ccf-sandbox
     command: |
       /bin/bash -c '
         rm -rf /workspace/sandbox*
@@ -35,13 +29,7 @@ services:
   jwt-issuer:
     build:
       context: test/utils/jwt
-      dockerfile_inline: |
-        FROM node:18-alpine3.16
-        RUN apk add curl # for healthcheck
-        COPY package*.json ./
-        RUN npm install
-        COPY . .
-        RUN npm run build
+      dockerfile: Dockerfile.jwt-issuer
     command: node dist/index.js
     network_mode: host
     environment:
