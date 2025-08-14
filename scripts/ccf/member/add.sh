@@ -56,14 +56,14 @@ ccf-member-add-acl() {
     local member_id=$1
     local roles=$2
 
-    curl $KMS_URL/app/ledgerUsers/$member_id?api-version=2024-08-22-preview \
+    curl $KMS_URL/app/users/$member_id?api-version=2024-01-26-preview \
         --cacert $KMS_SERVICE_CERT_PATH \
         -X PATCH \
         -H "Content-Type: application/merge-patch+json" \
         -H "Authorization: Bearer $(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')" \
         -d "$(jq -n --arg member_id "$member_id" --argjson roles "$roles" '{
             user_id: $member_id,
-            assignedRoles: $roles
+            assignedRole: $roles
         }')"
 }
 
