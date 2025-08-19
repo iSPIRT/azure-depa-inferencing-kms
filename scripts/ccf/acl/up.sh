@@ -69,7 +69,7 @@ acl-up() {
             --name $DEPLOYMENT_NAME \
             --subscription $SUBSCRIPTION \
             --resource-group $RESOURCE_GROUP \
-            --location "AustraliaEast" \
+            --location "CentralIndia" \
             --ledger-type "Public" \
             --aad-based-security-principals ledger-role-name="Administrator" principal-id="$(az account show | jq -r '.id')" \
             --cert-based-security-principals ledger-role-name="Administrator" cert="$(cat $KMS_MEMBER_CERT_PATH | tr -d "\n")" ledger-role-name="Reader" cert="$(cat $KMS_USER_CERT_PATH | tr -d "\n")"
@@ -83,13 +83,13 @@ acl-up() {
     export KMS_SERVICE_CERT_PATH="$WORKSPACE/service_cert.pem"
 
     ccf-member-add \
-        $(az account show | jq -r '.id') '"Administrator"'
+        $(az account show | jq -r '.id') '["Administrator"]'
 
     ccf-member-add \
-        $(cert-fingerprint $KMS_MEMBER_CERT_PATH) '"Administrator"'
+        $(cert-fingerprint $KMS_MEMBER_CERT_PATH) '["Administrator"]'
 
     ccf-member-add \
-        $(cert-fingerprint $KMS_USER_CERT_PATH) '"Reader"'
+        $(cert-fingerprint $KMS_USER_CERT_PATH) '["Reader"]'
 
     ccf-member-use member0
 }

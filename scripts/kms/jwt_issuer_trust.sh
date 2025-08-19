@@ -108,7 +108,6 @@ jwt-issuer-get-policy-from-token() {
     decode_jwt "$1" | jq -r '{
             iss,
             sub,
-            name,
             idtyp,
             oid
         } | with_entries(select(.value != null))'
@@ -210,6 +209,9 @@ jwt-issuer-trust() {
     export JWKS
     export JWT_VALIDATION_POLICY="\"validation_policy\": ${JWT_CLAIMS}"
     export ISSUER=$(echo $JWT_CLAIMS | jq -r '.iss')
+    export KMS_SERVICE_CERT_PATH="$WORKSPACE/service_cert.pem"
+    export KMS_MEMBER_CERT_PATH="$WORKSPACE/member0_cert.pem"
+    export KMS_MEMBER_PRIVK_PATH="$WORKSPACE/member0_privk.pem"
 
     if [[ "$KMS_URL" == *"confidential-ledger.azure.com" || "$TEST_ENVIRONMENT" == "ccf/acl" ]]; then
         ccf-member-add `az account show | jq -r '.id'` '["Reader"]'
