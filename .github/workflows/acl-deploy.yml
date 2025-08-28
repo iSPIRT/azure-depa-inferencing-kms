@@ -50,10 +50,24 @@ jobs:
 
       - name: Extract environment variables
         run: |
-          AKV_KEY_NAME=$(jq -r '.AKV_KEY_NAME' deployment_output.json)
-          echo "AKV_KEY_NAME=$AKV_KEY_NAME" >> $GITHUB_ENV
-          WORKSPACE=$(jq -r '.WORKSPACE' deployment_output.json)
-          echo "WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
+          for key in $(jq -r 'keys[]' deployment_output.json); do
+            value=$(jq -r --arg k "$key" '.[$k]' deployment_output.json)
+            # Only allow valid shell variable names
+            if [[ "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+              echo "Setting $key=$value"
+              echo "$key=$value" >> $GITHUB_ENV
+            fi
+          done
+
+      - name: Install KMS application
+        env:
+          KMS_WORKSPACE: ${{ env.WORKSPACE }}
+          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
+          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
+          KMS_MEMBER_PRIVK_PATH: ${{ env.KMS_MEMBER_PRIVK_PATH }}
+          KMS_URL: 'https://${{ inputs.kms_url }}.confidential-ledger.azure.com'
+        run: |
+          make js-app-set
 
       - name: Import member keys into Azure Key Vault
         env:

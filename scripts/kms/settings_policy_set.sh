@@ -13,7 +13,7 @@ settings-policy-set() {
     SETTINGS_POLICY_PROPOSAL=$1
 
     # Construct the proposal
-    cp $REPO_ROOT/$SETTINGS_POLICY_PROPOSAL $WORKSPACE/proposals/set_settings_policy.json
+    envsubst $REPO_ROOT/$SETTINGS_POLICY_PROPOSAL | jq . > $WORKSPACE/proposals/set_settings_policy.json
 
     result=$(mktemp)
     (

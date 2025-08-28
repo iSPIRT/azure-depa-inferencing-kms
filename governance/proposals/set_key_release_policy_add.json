@@ -3,7 +3,7 @@
     {
       "name": "set_key_release_policy",
       "args": {
-        "service": "some service",
+        "service": "depa-inferencing",
         "gte": {
           "x-ms-ver": "2"
         },
