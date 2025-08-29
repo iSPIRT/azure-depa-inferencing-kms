@@ -5,6 +5,7 @@
 
 akv-key-import() {
     set -e
+    set -x
 
     AKV_VAULT_NAME=${AKV_VAULT_NAME:-$1}
     if [ -z "$AKV_VAULT_NAME" ]; then

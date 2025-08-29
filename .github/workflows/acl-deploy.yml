@@ -42,6 +42,7 @@ jobs:
 
       - name: Install Azure CLI confidentialledger extension
         run: |
+          az version
           az extension add --name confidentialledger --yes
 
       - name: Deploy to ACL
