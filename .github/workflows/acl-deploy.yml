@@ -51,26 +51,27 @@ jobs:
           SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
         run: |
-          ./scripts/ccf/acl/up.sh > deployment_output.json
+          # Source the script to get access to its exported variables
+          source ./scripts/ccf/acl/up.sh
+          
+          # Set all the exported variables to GITHUB_ENV
+          echo "DEPLOYMENT_NAME=$DEPLOYMENT_NAME" >> $GITHUB_ENV
+          echo "WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
+          echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
+          echo "KMS_SERVICE_CERT_PATH=$KMS_SERVICE_CERT_PATH" >> $GITHUB_ENV
+          echo "KMS_MEMBER_CERT_PATH=$KMS_MEMBER_CERT_PATH" >> $GITHUB_ENV
+          echo "KMS_MEMBER_PRIVK_PATH=$KMS_MEMBER_PRIVK_PATH" >> $GITHUB_ENV
+          echo "KMS_USER_CERT_PATH=$KMS_USER_CERT_PATH" >> $GITHUB_ENV
+          echo "KMS_USER_PRIVK_PATH=$KMS_USER_PRIVK_PATH" >> $GITHUB_ENV
+          echo "AKV_KEY_NAME=$AKV_KEY_NAME" >> $GITHUB_ENV
 
-      - name: Extract environment variables
-        run: |
-          for key in $(jq -r 'keys[]' deployment_output.json); do
-            value=$(jq -r --arg k "$key" '.[$k]' deployment_output.json)
-            # Only allow valid shell variable names
-            if [[ "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-              echo "Setting $key=$value"
-              echo "$key=$value" >> $GITHUB_ENV
-            fi
-          done
 
       - name: Install KMS application
         env:
-          KMS_WORKSPACE: ${{ env.WORKSPACE }}
+          KMS_URL: ${{ env.KMS_URL }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
           KMS_MEMBER_PRIVK_PATH: ${{ env.KMS_MEMBER_PRIVK_PATH }}
-          KMS_URL: 'https://${{ inputs.kms_url }}.confidential-ledger.azure.com'
         run: |
           make js-app-set
 
