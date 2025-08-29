@@ -88,6 +88,7 @@ jobs:
         env:
           WORKSPACE: ${{ env.WORKSPACE }}
         run: |
+          mkdir -p $WORKSPACE/proposals
           make release-policy-set release-policy-proposal=./governance/proposals/set_key_release_policy_add.json
 
       - name: Set baseline key rotation policy
