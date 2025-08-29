@@ -1,0 +1,90 @@
+name: Deploy the KMS to ACL
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_name:
+        type: string
+        description: "Name of the deployment to use for ACL tests"
+  workflow_call:
+    inputs:
+      deployment_name:
+        type: string
+        description: "Name of the deployment to use for ACL tests"
+
+jobs:
+  deploy:
+    name: ${{ inputs.deployment_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pip install -r requirements.txt
+
+      - name: Log into Azure
+        uses: azure/login@v2
+        with:
+          # Use a managed identity to authenticate to Azure
+          # Use properties such as client-id, tenant-id, and subscription-id in the secrets and vars
+          # The managed identity should have a federated credential with subject identiier repo:<organization>/<repo>:pull_request
+          # Use subject identifier repo:<organization>/<repo>:ref:refs/heads/<branch> for running manual CI's
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to ACL
+        env:
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+          SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        run: |
+          ./scripts/ccf/acl/up.sh > deployment_output.json
+
+      - name: Extract environment variables
+        run: |
+          for key in $(jq -r 'keys[]' deployment_output.json); do
+            value=$(jq -r --arg k "$key" '.[$k]' deployment_output.json)
+            # Only allow valid shell variable names
+            if [[ "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+              echo "Setting $key=$value"
+              echo "$key=$value" >> $GITHUB_ENV
+            fi
+          done
+
+      - name: Install KMS application
+        env:
+          KMS_WORKSPACE: ${{ env.WORKSPACE }}
+          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
+          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
+          KMS_MEMBER_PRIVK_PATH: ${{ env.KMS_MEMBER_PRIVK_PATH }}
+          KMS_URL: 'https://${{ inputs.kms_url }}.confidential-ledger.azure.com'
+        run: |
+          make js-app-set
+
+      - name: Import member keys into Azure Key Vault
+        env:
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          AKV_KEY_NAME: ${{ env.AKV_KEY_NAME }}
+          WORKSPACE: ${{ env.WORKSPACE }}
+        run: |
+          ./scripts/akv/key-import.sh
+
+      - name: Set baseline key release policy
+        env:
+          WORKSPACE: ${{ env.WORKSPACE }}
+        run: |
+          make release-policy-set release-policy-proposal=./governance/proposals/set_key_release_policy_add.json
+
+      - name: Set baseline key rotation policy
+        env:
+          WORKSPACE: ${{ env.WORKSPACE }}
+        run: |
+          make key-rotation-policy-set key-rotation-policy-proposal=./governance/proposals/set_key_rotation_policy.json

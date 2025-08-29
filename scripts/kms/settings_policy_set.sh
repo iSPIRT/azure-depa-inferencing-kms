@@ -10,21 +10,10 @@ settings-policy-set() {
     REPO_ROOT="$(realpath "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../..")"
     source $REPO_ROOT/scripts/ccf/sign.sh
     source $REPO_ROOT/scripts/ccf/member/use.sh
-
-    # If settings policy not set, use default
-    if [ -z "$SETTINGS_POLICY" ]; then
-        export SETTINGS_POLICY=$(jq -n '{
-            "service": {
-                "name": "azure-privacy-sandbox-kms",
-                "description": "Key Management Service",
-                "version": "1.0.0",
-                "debug": false
-            }
-        }')
-    fi
+    SETTINGS_POLICY_PROPOSAL=$1
 
     # Construct the proposal
-    envsubst < $REPO_ROOT/governance/proposals/set_settings_policy.json | jq > $WORKSPACE/proposals/set_settings_policy.json
+    envsubst $REPO_ROOT/$SETTINGS_POLICY_PROPOSAL | jq . > $WORKSPACE/proposals/set_settings_policy.json
 
     result=$(mktemp)
     (
@@ -48,4 +37,4 @@ settings-policy-set() {
     set +e
 }
 
-settings-policy-set
+settings-policy-set "$@"

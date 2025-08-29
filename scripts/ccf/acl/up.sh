@@ -69,10 +69,10 @@ acl-up() {
             --name $DEPLOYMENT_NAME \
             --subscription $SUBSCRIPTION \
             --resource-group $RESOURCE_GROUP \
-            --location "AustraliaEast" \
+            --location "CentralIndia" \
             --ledger-type "Public" \
-            --aad-based-security-principals "[{ledger-role-name:Administrator,principal-id:$(az account show | jq -r '.id')}]" \
-            --cert-based-security-principals "[{ledger-role-name:Administrator,cert:'$(cat $KMS_MEMBER_CERT_PATH)'},{ledger-role-name:Reader,cert:'$(cat $KMS_USER_CERT_PATH)'}]"
+            --aad-based-security-principals ledger-role-name="Administrator" principal-id="$(az account show | jq -r '.id')" \
+            --cert-based-security-principals ledger-role-name="Administrator" cert="$(cat $KMS_MEMBER_CERT_PATH | tr -d "\n")" ledger-role-name="Reader" cert="$(cat $KMS_USER_CERT_PATH | tr -d "\n")"
     else
         echo "Ledger already exists, skipping deployment."
     fi
