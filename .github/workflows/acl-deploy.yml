@@ -40,6 +40,10 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Install Azure CLI confidentialledger extension
+        run: |
+          az extension add --name confidentialledger --yes
+
       - name: Deploy to ACL
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
