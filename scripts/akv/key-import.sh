@@ -18,10 +18,20 @@ akv-key-import() {
     fi
     export AKV_KEY_NAME
 
-    az keyvault key import \
+    # Convert the private key to PKCS8 format
+    openssl pkcs8 -topk8 -nocrypt \
+        -in $WORKSPACE/${AKV_KEY_NAME}_privk.pem \
+        -out $WORKSPACE/${AKV_KEY_NAME}_privk-pkcs8.pem
+
+    # Combine the public key with the private key
+    cat $WORKSPACE/${AKV_KEY_NAME}_privk-pkcs8.pem \
+        $WORKSPACE/${AKV_KEY_NAME}_cert.pem \
+        > $WORKSPACE/${AKV_KEY_NAME}_combined_cert.pem
+
+    az keyvault certificate import \
         --vault-name $AKV_VAULT_NAME \
-        --name $AKV_KEY_NAME \
-        --pem-file $WORKSPACE/${AKV_KEY_NAME}_privk.pem
+        --name ${AKV_KEY_NAME}-${DEPLOYMENT_NAME} \
+        --file $WORKSPACE/${AKV_KEY_NAME}_combined_cert.pem
 
     set +e
 }

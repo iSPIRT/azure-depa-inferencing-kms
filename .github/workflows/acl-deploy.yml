@@ -78,6 +78,7 @@ jobs:
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           AKV_KEY_NAME: ${{ env.AKV_KEY_NAME }}
           WORKSPACE: ${{ env.WORKSPACE }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
         run: |
           ./scripts/akv/key-import.sh
 
