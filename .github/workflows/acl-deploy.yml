@@ -1,4 +1,4 @@
-name: Deploy the KMS to ACL
+name: Deploy to ACL
 
 permissions:
   id-token: write
