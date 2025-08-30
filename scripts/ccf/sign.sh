@@ -12,6 +12,8 @@
 
 ccf-sign() {
 
+    set -x 
+
     content=$1
     msg_type=${2:-"proposal"}
     extra_args="${@:3}"
@@ -32,6 +34,14 @@ ccf-sign() {
             --resource https://vault.azure.net \
             --query accessToken --output tsv \
         )
+
+        export AKV_URL=$( \
+            az keyvault key show \
+            --vault-name $AKV_VAULT_NAME \
+            --name $AKV_KEY_NAME \
+            --query key.kid \
+            --output tsv)
+
         signature=$(mktemp)
         ccf_cose_sign1_prepare \
             --ccf-gov-msg-type $msg_type \
@@ -42,7 +52,7 @@ ccf-sign() {
             | curl -X POST -s \
                 -H "Authorization: Bearer $bearer_token" \
                 -H "Content-Type: application/json" \
-                "${AKV_URL}/keys/${AKV_KEY_NAME}/sign?api-version=7.2" \
+                "${AKV_URL}/sign?api-version=7.2" \
                 -d @- > $signature
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
