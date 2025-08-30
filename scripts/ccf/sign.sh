@@ -15,9 +15,9 @@ ccf-sign() {
     content=$1
     msg_type=${2:-"proposal"}
     extra_args="${@:3}"
-    USE_AKV=${USE_AKV:-false}
+    USE_AKV=${USE_AKV:-"false"}
 
-    if [[ $USE_AKV == false ]]; then
+    if [[ "$USE_AKV" == "false" ]]; then
         ccf_cose_sign1 \
             --content $content \
             --signing-cert ${KMS_MEMBER_CERT_PATH} \

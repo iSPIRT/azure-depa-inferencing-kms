@@ -46,11 +46,26 @@ jobs:
           az version
           az extension add --name confidentialledger --yes
 
+      - name: Create member and user keys in Azure Key Vault
+        env:
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+          WORKSPACE: ${{ env.WORKSPACE }}
+        run: |
+          # Source the script to get access to its exported variables
+          source ./scripts/akv/key-create.sh
+
+          # Set all the exported variables to GITHUB_ENV
+          echo "KMS_MEMBER_CERT_PATH=$KMS_MEMBER_CERT_PATH" >> $GITHUB_ENV
+          echo "KMS_USER_CERT_PATH=$KMS_USER_CERT_PATH" >> $GITHUB_ENV
+
       - name: Deploy to ACL
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
           SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
+          KMS_USER_CERT_PATH: ${{ env.KMS_USER_CERT_PATH }}
         run: |
           # Source the script to get access to its exported variables
           source ./scripts/ccf/acl/up.sh
@@ -60,40 +75,42 @@ jobs:
           echo "WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
           echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
           echo "KMS_SERVICE_CERT_PATH=$KMS_SERVICE_CERT_PATH" >> $GITHUB_ENV
-          echo "KMS_MEMBER_CERT_PATH=$KMS_MEMBER_CERT_PATH" >> $GITHUB_ENV
-          echo "KMS_MEMBER_PRIVK_PATH=$KMS_MEMBER_PRIVK_PATH" >> $GITHUB_ENV
-          echo "KMS_USER_CERT_PATH=$KMS_USER_CERT_PATH" >> $GITHUB_ENV
-          echo "KMS_USER_PRIVK_PATH=$KMS_USER_PRIVK_PATH" >> $GITHUB_ENV
           echo "AKV_KEY_NAME=$AKV_KEY_NAME" >> $GITHUB_ENV
 
+      - name: Create proposals directory
+        env:
+          KMS_WORKSPACE: ${{ env.WORKSPACE }}
+        run: |
+          mkdir -p ${KMS_WORKSPACE}/proposals
 
       - name: Install KMS application
         env:
           KMS_URL: ${{ env.KMS_URL }}
+          KMS_WORKSPACE: ${{ env.WORKSPACE }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
-          KMS_MEMBER_PRIVK_PATH: ${{ env.KMS_MEMBER_PRIVK_PATH }}
+          USE_AKV: "true"
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          AKV_KEY_NAME: "member0"
         run: |
           make js-app-set
 
-      - name: Import member keys into Azure Key Vault
-        env:
-          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: ${{ env.AKV_KEY_NAME }}
-          WORKSPACE: ${{ env.WORKSPACE }}
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
-        run: |
-          ./scripts/akv/key-import.sh
-
       - name: Set baseline key release policy
         env:
+          KMS_URL: ${{ env.KMS_URL }}
           KMS_WORKSPACE: ${{ env.WORKSPACE }}
+          USE_AKV: "true"
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          AKV_KEY_NAME: "member0"
         run: |
-          mkdir -p $WORKSPACE/proposals
           make release-policy-set release-policy-proposal=./governance/proposals/set_key_release_policy_add.json
 
       - name: Set baseline key rotation policy
         env:
+          KMS_URL: ${{ env.KMS_URL }}
           KMS_WORKSPACE: ${{ env.WORKSPACE }}
+          USE_AKV: "true"
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          AKV_KEY_NAME: member0
         run: |
           make key-rotation-policy-set key-rotation-policy-proposal=./governance/proposals/set_key_rotation_policy.json

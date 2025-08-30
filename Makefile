@@ -173,13 +173,19 @@ jwt-issuer-down:
 jwt-issuer-trust:
 	@WORKSPACE=${KMS_WORKSPACE} \
 	KMS_URL=${KMS_URL} \
+	KMS_SERVICE_CERT_PATH=${KMS_SERVICE_CERT_PATH} \
+	KMS_MEMBER_CERT_PATH=${KMS_MEMBER_CERT_PATH} \
+	KMS_MEMBER_PRIVK_PATH=${KMS_MEMBER_PRIVK_PATH} \
 	DEPLOYMENT_ENV=${DEPLOYMENT_ENV} \
-		./scripts/kms/jwt_issuer_trust.sh --demo
+		./scripts/kms/jwt_issuer_trust.sh --aad
 
 # Manage KMS -------------------------------------------------------------------
 
 js-app-set:
 	@WORKSPACE=${KMS_WORKSPACE} \
+	KMS_SERVICE_CERT_PATH=${KMS_SERVICE_CERT_PATH} \
+	KMS_MEMBER_CERT_PATH=${KMS_MEMBER_CERT_PATH} \
+	KMS_MEMBER_PRIVK_PATH=${KMS_MEMBER_PRIVK_PATH} \
 	KMS_URL=${KMS_URL} \
 		./scripts/kms/js_app_set.sh
 
