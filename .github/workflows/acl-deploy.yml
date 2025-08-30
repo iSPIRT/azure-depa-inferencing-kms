@@ -58,6 +58,8 @@ jobs:
           echo "KMS_WORKSPACE=$KMS_WORKSPACE" >> $GITHUB_ENV
           echo "KMS_MEMBER_CERT_PATH=$KMS_MEMBER_CERT_PATH" >> $GITHUB_ENV
           echo "KMS_USER_CERT_PATH=$KMS_USER_CERT_PATH" >> $GITHUB_ENV
+          echo "MEMBER_CERT_NAME=$MEMBER_CERT_NAME" >> $GITHUB_ENV
+          echo "USER_CERT_NAME=$USER_CERT_NAME" >> $GITHUB_ENV
 
       - name: Deploy to ACL
         env:
@@ -72,7 +74,6 @@ jobs:
           source ./scripts/ccf/acl/up.sh
           
           # Set all the exported variables to GITHUB_ENV
-          echo "DEPLOYMENT_NAME=$DEPLOYMENT_NAME" >> $GITHUB_ENV
           echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
           echo "KMS_SERVICE_CERT_PATH=$KMS_SERVICE_CERT_PATH" >> $GITHUB_ENV
 
@@ -84,7 +85,7 @@ jobs:
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
           USE_AKV: "true"
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: "member0"
+          AKV_KEY_NAME: ${{ env.MEMBER_CERT_NAME }}
         run: |
           make js-app-set
 
@@ -94,7 +95,7 @@ jobs:
           KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           USE_AKV: "true"
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: "member0"
+          AKV_KEY_NAME: ${{ env.MEMBER_CERT_NAME }}
         run: |
           make release-policy-set release-policy-proposal=./governance/proposals/set_key_release_policy_add.json
 
@@ -104,6 +105,6 @@ jobs:
           KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           USE_AKV: "true"
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: member0
+          AKV_KEY_NAME: ${{ env.MEMBER_CERT_NAME }}
         run: |
           make key-rotation-policy-set key-rotation-policy-proposal=./governance/proposals/set_key_rotation_policy.json
