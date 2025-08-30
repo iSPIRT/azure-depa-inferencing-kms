@@ -71,7 +71,7 @@ acl-up() {
             --resource-group $RESOURCE_GROUP \
             --location "CentralIndia" \
             --ledger-type "Public" \
-            --aad-based-security-principals "[{\"principal-id\":\"$(az account show --query id -o tsv)\", \"ledger-role-name\":\"Administrator\"}, {\"principal-id\":\"cb1f67cf-ac55-4a24-9697-4339e099c932\", \"ledger-role-name\":\"Administrator\"}]" \
+            --aad-based-security-principals "[{\"principal-id\":\"$(az account show --query id -o tsv)\", \"ledger-role-name\":\"Administrator\"}]" \
             --cert-based-security-principals "[{\"cert\":\"$(cat $KMS_MEMBER_CERT_PATH | tr -d '\n')\", \"ledger-role-name\":\"Administrator\"}, {\"cert\":\"$(cat $KMS_USER_CERT_PATH | tr -d '\n')\", \"ledger-role-name\":\"Reader\"}]"
     else
         echo "Ledger already exists, skipping deployment."
@@ -81,8 +81,6 @@ acl-up() {
     curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
         | jq -r '.ledgerTlsCertificate' > $WORKSPACE/service_cert.pem
     export KMS_SERVICE_CERT_PATH="$WORKSPACE/service_cert.pem"
-
-    ccf-member-add cb1f67cf-ac55-4a24-9697-4339e099c932 '["Administrator"]'
 
     ccf-member-add \
         $(az account show | jq -r '.id') '["Administrator"]'
