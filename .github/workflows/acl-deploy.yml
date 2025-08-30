@@ -50,12 +50,12 @@ jobs:
         env:
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
-          WORKSPACE: ${{ env.WORKSPACE }}
         run: |
           # Source the script to get access to its exported variables
           source ./scripts/akv/key-create.sh
 
           # Set all the exported variables to GITHUB_ENV
+          echo "KMS_WORKSPACE=$KMS_WORKSPACE" >> $GITHUB_ENV
           echo "KMS_MEMBER_CERT_PATH=$KMS_MEMBER_CERT_PATH" >> $GITHUB_ENV
           echo "KMS_USER_CERT_PATH=$KMS_USER_CERT_PATH" >> $GITHUB_ENV
 
@@ -64,6 +64,7 @@ jobs:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
           SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
           KMS_USER_CERT_PATH: ${{ env.KMS_USER_CERT_PATH }}
         run: |
@@ -72,21 +73,13 @@ jobs:
           
           # Set all the exported variables to GITHUB_ENV
           echo "DEPLOYMENT_NAME=$DEPLOYMENT_NAME" >> $GITHUB_ENV
-          echo "WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
           echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
           echo "KMS_SERVICE_CERT_PATH=$KMS_SERVICE_CERT_PATH" >> $GITHUB_ENV
-          echo "AKV_KEY_NAME=$AKV_KEY_NAME" >> $GITHUB_ENV
-
-      - name: Create proposals directory
-        env:
-          KMS_WORKSPACE: ${{ env.WORKSPACE }}
-        run: |
-          mkdir -p ${KMS_WORKSPACE}/proposals
 
       - name: Install KMS application
         env:
           KMS_URL: ${{ env.KMS_URL }}
-          KMS_WORKSPACE: ${{ env.WORKSPACE }}
+          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
           USE_AKV: "true"
@@ -98,7 +91,7 @@ jobs:
       - name: Set baseline key release policy
         env:
           KMS_URL: ${{ env.KMS_URL }}
-          KMS_WORKSPACE: ${{ env.WORKSPACE }}
+          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           USE_AKV: "true"
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           AKV_KEY_NAME: "member0"
@@ -108,7 +101,7 @@ jobs:
       - name: Set baseline key rotation policy
         env:
           KMS_URL: ${{ env.KMS_URL }}
-          KMS_WORKSPACE: ${{ env.WORKSPACE }}
+          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           USE_AKV: "true"
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           AKV_KEY_NAME: member0
