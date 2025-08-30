@@ -13,10 +13,15 @@ akv-key-create() {
     fi
     export AKV_VAULT_NAME
 
+    # Create a workspace for certs
+    export WORKSPACE=~/$DEPLOYMENT_NAME.aclworkspace
+    mkdir -p $WORKSPACE/proposals
+
     export MEMBER_CERT_NAME=${DEPLOYMENT_NAME}-member0
     export USER_CERT_NAME=${DEPLOYMENT_NAME}-user0
-    export KMS_MEMBER_CERT_PATH=${WORKSPACE}/member0_cert.pem
-    export KMS_USER_CERT_PATH=${WORKSPACE}/user0_cert.pem
+    export KMS_WORKSPACE=${WORKSPACE}
+    export KMS_MEMBER_CERT_PATH=${KMS_WORKSPACE}/member0_cert.pem
+    export KMS_USER_CERT_PATH=${KMS_WORKSPACE}/user0_cert.pem
 
     az keyvault certificate create \
         --vault-name $AKV_VAULT_NAME \
@@ -46,6 +51,7 @@ akv-key-create() {
 akv-key-create "$@"
 
 jq -n '{
+    KMS_WORKSPACE: env.KMS_WORKSPACE,
     KMS_MEMBER_CERT_PATH: env.KMS_MEMBER_CERT_PATH,
     KMS_USER_CERT_PATH: env.KMS_USER_CERT_PATH,
 }'
