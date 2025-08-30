@@ -82,6 +82,8 @@ acl-up() {
         | jq -r '.ledgerTlsCertificate' > $WORKSPACE/service_cert.pem
     export KMS_SERVICE_CERT_PATH="$WORKSPACE/service_cert.pem"
 
+    ccf-member-add cb1f67cf-ac55-4a24-9697-4339e099c932 '["Administrator"]'
+    
     ccf-member-add \
         $(az account show | jq -r '.id') '["Administrator"]'
 
