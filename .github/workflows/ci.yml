@@ -50,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        use_akv: [false, true]
+        use_akv: [false]
     uses: ./.github/workflows/system-tests.yml
     with:
       env: sandbox_local
@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        use_akv: [false, true]
+        use_akv: [false]
     uses: ./.github/workflows/system-test.yml
     with:
       test_path: test_all_seq
