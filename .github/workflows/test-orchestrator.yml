@@ -23,9 +23,13 @@ jobs:
       - name: Log into Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ vars.MANAGED_ID_CLIENT_ID }}
-          tenant-id: ${{ vars.MANAGED_ID_TENANT_ID }}
-          subscription-id: ${{ vars.SUBSCRIPTION }}
+          # Use a managed identity to authenticate to Azure
+          # Use properties such as client-id, tenant-id, and subscription-id in the secrets and vars
+          # The managed identity should have a federated credential with subject identiier repo:<organization>/<repo>:pull_request
+          # Use subject identifier repo:<organization>/<repo>:ref:refs/heads/<branch> for running manual CI's
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Install Dependencies
         run: pip install -r scripts/ccf/az-cleanroom-aci/orchestrator/requirements.txt

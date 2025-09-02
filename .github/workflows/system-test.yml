@@ -57,6 +57,8 @@ jobs:
         env:
           TEST_ENVIRONMENT: ccf/${{ inputs.env }}
           USE_AKV: ${{ inputs.use_akv }}
+          SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}      
         run: |
           pytest -sv \
             test/system-test/${{ inputs.test_path }}.py
