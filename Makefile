@@ -177,7 +177,7 @@ jwt-issuer-trust:
 	KMS_MEMBER_CERT_PATH=${KMS_MEMBER_CERT_PATH} \
 	KMS_MEMBER_PRIVK_PATH=${KMS_MEMBER_PRIVK_PATH} \
 	DEPLOYMENT_ENV=${DEPLOYMENT_ENV} \
-		./scripts/kms/jwt_issuer_trust.sh --aad
+		./scripts/kms/jwt_issuer_trust.sh --demo
 
 # Manage KMS -------------------------------------------------------------------
 
