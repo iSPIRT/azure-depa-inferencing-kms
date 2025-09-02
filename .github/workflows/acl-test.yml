@@ -1,0 +1,66 @@
+name: Test KMS on ACL using ACI
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_name:
+        type: string
+        description: "Name of the deployment to use for ACL tests"
+      use_akv:
+        type: boolean
+        description: Whether or not to store keys in AKV
+  workflow_call:
+    inputs:
+      deployment_name:
+        type: string
+        description: "Name of the deployment to use for ACL tests"
+      use_akv:
+        type: boolean
+        description: Whether or not to store keys in AKV
+
+jobs:
+  test:
+    name: ${{ inputs.test_path }} (${{ inputs.env }}, ${{ inputs.use_akv && 'akv' || 'local' }}_keys)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pip install -r requirements.txt
+
+      - name: Log into Azure
+        uses: azure/login@v2
+        with:
+          # Use a managed identity to authenticate to Azure
+          # Use properties such as client-id, tenant-id, and subscription-id in the secrets and vars
+          # The managed identity should have a federated credential with subject identiier repo:<organization>/<repo>:pull_request
+          # Use subject identifier repo:<organization>/<repo>:ref:refs/heads/<branch> for running manual CI's
+          client-id: ${{ vars.MANAGED_ID_CLIENT_ID }}
+          tenant-id: ${{ vars.MANAGED_ID_TENANT_ID }}
+          subscription-id: ${{ vars.SUBSCRIPTION }}
+
+      - name: Deploy to ACL
+        env:
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+        run: |
+          ./scripts/ccf/acl/up.sh
+
+      - name: Deploy B&A services to ACI
+        env:
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+        run: |
+          ./scripts/aci/up.sh
+
+      - name: Stop ACL
+        env:
+          TEST_ENVIRONMENT: ccf/${{ inputs.env }}
+          USE_AKV: ${{ inputs.use_akv }}
+        run: |
+          ./scripts/ccf/acl/up.sh ${{ inputs.deployment_name }}

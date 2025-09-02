@@ -72,7 +72,7 @@
         "js_function": "keyReleasePolicy",
         "forwarding_required": "sometimes",
         "redirection_strategy": "none",
-        "authn_policies": ["member_cert", "user_cert", "jwt"],
+        "authn_policies": [],
         "mode": "readonly",
         "openapi": {
           "responses": {
