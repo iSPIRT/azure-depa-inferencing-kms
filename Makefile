@@ -197,13 +197,14 @@ release-policy-set:
 	KMS_MEMBER_PRIVK_PATH=${KMS_MEMBER_PRIVK_PATH} \
 	./scripts/kms/release_policy_set.sh $(release-policy-proposal)
 
+# Settings policy should be set in SETTINGS_POLICY
 settings-policy-set:
 	@WORKSPACE=${KMS_WORKSPACE} \
 	KMS_URL=${KMS_URL} \
 	KMS_SERVICE_CERT_PATH=${KMS_SERVICE_CERT_PATH} \
 	KMS_MEMBER_CERT_PATH=${KMS_MEMBER_CERT_PATH} \
 	KMS_MEMBER_PRIVK_PATH=${KMS_MEMBER_PRIVK_PATH} \
-	./scripts/kms/settings_policy_set.sh $(settings-policy-proposal)
+	./scripts/kms/settings_policy_set.sh
 
 key-rotation-policy-set:
 	@WORKSPACE=${KMS_WORKSPACE} \
