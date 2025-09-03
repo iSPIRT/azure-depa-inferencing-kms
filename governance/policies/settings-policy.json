@@ -7,7 +7,7 @@
           "service": {
             "name": "azure-privacy-sandbox-kms",
             "description": "Key Management Service",
-            "version": "1.0.0",
+            "version": "2.0.0",
             "debug": true
           }
         }

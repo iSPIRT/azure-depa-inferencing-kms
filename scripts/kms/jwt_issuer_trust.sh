@@ -108,6 +108,7 @@ jwt-issuer-get-policy-from-token() {
     decode_jwt "$1" | jq -r '{
             iss,
             sub,
+            name,
             idtyp,
             oid
         } | with_entries(select(.value != null))'

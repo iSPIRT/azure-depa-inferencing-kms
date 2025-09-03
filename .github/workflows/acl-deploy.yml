@@ -1,4 +1,4 @@
-name: Deploy the KMS to ACL
+name: Deploy to ACL
 
 permissions:
   id-token: write
@@ -20,6 +20,7 @@ jobs:
   deploy:
     name: ${{ inputs.deployment_name }}
     runs-on: ubuntu-latest
+    continue-on-error: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,51 +41,70 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Install Azure CLI confidentialledger extension
+        run: |
+          az version
+          az extension add --name confidentialledger --yes
+
+      - name: Create member and user keys in Azure Key Vault
+        env:
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+        run: |
+          # Source the script to get access to its exported variables
+          source ./scripts/akv/key-create.sh
+
+          # Set all the exported variables to GITHUB_ENV
+          echo "KMS_WORKSPACE=$KMS_WORKSPACE" >> $GITHUB_ENV
+          echo "KMS_MEMBER_CERT_PATH=$KMS_MEMBER_CERT_PATH" >> $GITHUB_ENV
+          echo "KMS_USER_CERT_PATH=$KMS_USER_CERT_PATH" >> $GITHUB_ENV
+          echo "MEMBER_CERT_NAME=$MEMBER_CERT_NAME" >> $GITHUB_ENV
+          echo "USER_CERT_NAME=$USER_CERT_NAME" >> $GITHUB_ENV
+
       - name: Deploy to ACL
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
           SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
+          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
+          KMS_USER_CERT_PATH: ${{ env.KMS_USER_CERT_PATH }}
         run: |
-          ./scripts/ccf/acl/up.sh > deployment_output.json
-
-      - name: Extract environment variables
-        run: |
-          for key in $(jq -r 'keys[]' deployment_output.json); do
-            value=$(jq -r --arg k "$key" '.[$k]' deployment_output.json)
-            # Only allow valid shell variable names
-            if [[ "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-              echo "Setting $key=$value"
-              echo "$key=$value" >> $GITHUB_ENV
-            fi
-          done
+          # Source the script to get access to its exported variables
+          source ./scripts/ccf/acl/up.sh
+          
+          # Set all the exported variables to GITHUB_ENV
+          echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
+          echo "KMS_SERVICE_CERT_PATH=$KMS_SERVICE_CERT_PATH" >> $GITHUB_ENV
 
       - name: Install KMS application
         env:
-          KMS_WORKSPACE: ${{ env.WORKSPACE }}
+          KMS_URL: ${{ env.KMS_URL }}
+          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
-          KMS_MEMBER_PRIVK_PATH: ${{ env.KMS_MEMBER_PRIVK_PATH }}
-          KMS_URL: 'https://${{ inputs.kms_url }}.confidential-ledger.azure.com'
+          USE_AKV: "true"
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          AKV_KEY_NAME: ${{ env.MEMBER_CERT_NAME }}
         run: |
           make js-app-set
 
-      - name: Import member keys into Azure Key Vault
-        env:
-          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: ${{ env.AKV_KEY_NAME }}
-          WORKSPACE: ${{ env.WORKSPACE }}
-        run: |
-          ./scripts/akv/key-import.sh
-
       - name: Set baseline key release policy
         env:
-          WORKSPACE: ${{ env.WORKSPACE }}
+          KMS_URL: ${{ env.KMS_URL }}
+          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
+          USE_AKV: "true"
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          AKV_KEY_NAME: ${{ env.MEMBER_CERT_NAME }}
         run: |
           make release-policy-set release-policy-proposal=./governance/proposals/set_key_release_policy_add.json
 
       - name: Set baseline key rotation policy
         env:
-          WORKSPACE: ${{ env.WORKSPACE }}
+          KMS_URL: ${{ env.KMS_URL }}
+          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
+          USE_AKV: "true"
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          AKV_KEY_NAME: ${{ env.MEMBER_CERT_NAME }}
         run: |
           make key-rotation-policy-set key-rotation-policy-proposal=./governance/proposals/set_key_rotation_policy.json

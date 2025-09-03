@@ -1,4 +1,4 @@
-name: System Test
+name: Update code in an ACL instance
 
 permissions:
   id-token: write
@@ -7,32 +7,22 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
-      test_path:
+      deployment_name:
         type: string
-        description: "Path to pytest file/s"
-      env:
-        type: string
-        description: The CCF service type to run KMS on
-      use_akv:
-        type: boolean
-        description: Whether or not to store keys in AKV
+        description: "Name of the deployment"
+        default: "depa-inferencing-kms"
   workflow_call:
     inputs:
-      test_path:
+      deployment_name:
         type: string
-        description: "Path to pytest file/s"
-      env:
-        type: string
-        description: The CCF service type to run KMS on
-      use_akv:
-        type: boolean
-        description: Whether or not to store keys in AKV
+        description: "Name of the deployment"
+        default: "depa-inferencing-kms"
 
 jobs:
-
-  test:
-    name: ${{ inputs.test_path }} (${{ inputs.env }}, ${{ inputs.use_akv && 'akv' || 'local' }}_keys)
+  deploy:
+    name: ${{ inputs.deployment_name }}
     runs-on: ubuntu-latest
+    continue-on-error: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,7 +32,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: pip install -r requirements.txt
 
-      - name: Azure login
+      - name: Log into Azure
         uses: azure/login@v2
         with:
           # Use a managed identity to authenticate to Azure
@@ -53,12 +43,18 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Run System Tests
+      - name: Download KMS service certificate
         env:
-          TEST_ENVIRONMENT: ccf/${{ inputs.env }}
-          USE_AKV: ${{ inputs.use_akv }}
-          SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}      
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
         run: |
-          pytest -sv \
-            test/system-test/${{ inputs.test_path }}.py
+          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
+          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
+            | jq -r '.ledgerTlsCertificate' > $KMS_SERVICE_CERT_PATH
+
+      - name: Update KMS application
+        env:
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+        run: |
+          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
+          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
+          make js-app-set

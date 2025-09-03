@@ -5,7 +5,8 @@
 
 release-policy-set() {
     set -e
-
+    set -x 
+    
     REPO_ROOT="$(realpath "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../..")"
     source $REPO_ROOT/scripts/ccf/sign.sh
     source $REPO_ROOT/scripts/ccf/member/use.sh
