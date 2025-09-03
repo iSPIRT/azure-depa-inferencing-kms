@@ -1,4 +1,4 @@
-name: Update code in an ACL instance
+name: Update code in ACL
 
 permissions:
   id-token: write

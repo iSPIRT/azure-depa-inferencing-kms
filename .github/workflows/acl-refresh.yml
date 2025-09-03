@@ -1,4 +1,4 @@
-name: Get KMS properties
+name: Refresh keys
 
 permissions:
   id-token: write
@@ -43,11 +43,6 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Install Azure CLI confidentialledger extension
-        run: |
-          az version
-          az extension add --name confidentialledger --yes
-
       - name: Get service certificate
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
@@ -55,14 +50,18 @@ jobs:
           curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
           | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
 
-      - name: Get policies
+      - name: Call refresh
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
         run: |
+          # List public keys for refresh
+          curl ${KMS_URL}/app/listpubkeys "Content-Type: application/json" -w '\n' | jq
+
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
           export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
           export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
-          curl ${KMS_URL}/app/keyReleasePolicy --cacert ${KMS_SERVICE_CERT_PATH} \
+          curl ${KMS_URL}/app/refresh --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
-          curl ${KMS_URL}/app/settingsPolicy --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+          
+          # List public keys after refresh
+          curl ${KMS_URL}/app/listpubkeys "Content-Type: application/json" -w '\n' | jq
