@@ -52,22 +52,17 @@ jobs:
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
         run: |
-          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${DEPLOYMENT_NAME} \ 
+          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
           | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
 
-      - name: Get key release policy
+      - name: Get policies
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
         run: |
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
-          curl ${KMS_URL}/app/keyReleasePolicy --cacert ${KMS_SERVICE_CERT_PATH} \ 
-            -H "Content-Type: application/json" -w '\n' | jq
-
-
-      - name: Get settings policy
-        env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
-        run: |
-          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
-          curl ${KMS_URL}/app/settingsPolicy --cacert ${KMS_SERVICE_CERT_PATH} \ 
-            -H "Content-Type: application/json" -w '\n' | jq
+          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
+          export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
+          curl ${KMS_URL}/app/keyReleasePolicy --cacert ${KMS_SERVICE_CERT_PATH} \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+          curl ${KMS_URL}/app/settingsPolicy --cacert ${KMS_SERVICE_CERT_PATH} \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
