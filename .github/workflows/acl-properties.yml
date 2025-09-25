@@ -54,7 +54,7 @@ jobs:
         run: |
           curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
           | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
-
+            
       - name: Get policies
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
@@ -66,3 +66,12 @@ jobs:
             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
           curl ${KMS_URL}/app/settingsPolicy --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+
+      - name: Get public keys
+        env:
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+        run: |
+          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
+          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
+          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
+            -H "Content-Type: application/json" -w '\n' | jq
