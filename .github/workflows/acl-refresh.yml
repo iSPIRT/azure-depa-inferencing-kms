@@ -23,7 +23,7 @@ on:
 
 jobs:
   deploy:
-    name: ${{ inputs.deployment_name }}
+    name: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
     runs-on: ubuntu-latest
     continue-on-error: false
     steps:
@@ -55,7 +55,7 @@ jobs:
 
       - name: Call refresh
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
         run: |
 
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
