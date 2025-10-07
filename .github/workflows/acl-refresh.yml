@@ -48,7 +48,7 @@ jobs:
 
       - name: Get service certificate
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
         run: |
           curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
           | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
