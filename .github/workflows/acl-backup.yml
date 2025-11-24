@@ -27,11 +27,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: pip install -r requirements.txt
-
       - name: Log into Azure
         uses: azure/login@v2
         with:
@@ -54,6 +49,13 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "Starting backup for deployment '${DEPLOYMENT_NAME}'"
+          echo "Subscription: ${SUBSCRIPTION_ID}"
+          echo "Resource group: ${RESOURCE_GROUP}"
+          echo "Storage account: ${STORAGE_ACCOUNT}"
+          echo "Fileshare: ${FILESHARE_NAME}"
+          echo "Restore region: ${RESTORE_REGION}"
+
           if [ -z "${STORAGE_ACCOUNT:-}" ]; then
             echo "STORAGE_ACCOUNT secret (AZURE_KMS_BACKUP_STORAGE_ACCOUNT) is required" >&2
             exit 1
@@ -67,6 +69,7 @@ jobs:
           # Generate SAS token for the fileshare (valid for 1 day)
           # Permissions: rwdl (read, write, delete, list)
           EXPIRY=$(date -u -d "+1 day" +"%Y-%m-%dT%H:%MZ")
+          echo "Generating SAS token that expires at ${EXPIRY}"
           SAS_TOKEN=$(az storage share generate-sas \
             --account-name "$STORAGE_ACCOUNT" \
             --name "$FILESHARE_NAME" \
@@ -74,12 +77,15 @@ jobs:
             --expiry "$EXPIRY" \
             --https-only \
             --output tsv)
+          echo "SAS token generated (length ${#SAS_TOKEN})"
 
           # Construct the full SAS URI
           BACKUP_SAS_URI="https://${STORAGE_ACCOUNT}.file.core.windows.net/${FILESHARE_NAME}?${SAS_TOKEN}"
           echo "Generated SAS URI for backup"
 
+          echo "Requesting ARM access token for https://management.azure.com"
           MANAGEMENT_TOKEN=$(az account get-access-token --resource https://management.azure.com | jq -r '.accessToken')
+          echo "Received ARM access token"
 
           API_VERSION="2024-09-19-preview"
           URL="https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${RESOURCE_GROUP}/providers/Microsoft.ConfidentialLedger/ledgers/${DEPLOYMENT_NAME}/backup?api-version=${API_VERSION}"
@@ -87,7 +93,7 @@ jobs:
           # Build request body per docs: https://learn.microsoft.com/en-us/rest/api/resource-manager/confidentialledger/ledger/backup?view=rest-resource-manager-confidentialledger-2024-09-19-preview&tabs=HTTP
           BODY=$(jq -n --arg uri "$BACKUP_SAS_URI" --arg rr "$RESTORE_REGION" '{uri: $uri, restoreRegion: $rr}')
 
-          echo "Calling backup for ledger '${DEPLOYMENT_NAME}' in resource group '${RESOURCE_GROUP}'"
+          echo "Calling backup for ledger '${DEPLOYMENT_NAME}' in resource group '${RESOURCE_GROUP}' with body '$(BODY)'"
           HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" -X POST "$URL" \
             -H "Authorization: Bearer $MANAGEMENT_TOKEN" \
             -H "Content-Type: application/json" \
@@ -100,3 +106,9 @@ jobs:
             echo "Backup request failed" >&2
             exit 1
           fi
+
+          MESSAGE=$(jq -r '.message // empty' response.json)
+          if [ -n "$MESSAGE" ]; then
+            echo "Backup service message: $MESSAGE"
+          fi
+          echo "Ledger backup triggered successfully"
