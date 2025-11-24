@@ -93,7 +93,7 @@ jobs:
           # Build request body per docs: https://learn.microsoft.com/en-us/rest/api/resource-manager/confidentialledger/ledger/backup?view=rest-resource-manager-confidentialledger-2024-09-19-preview&tabs=HTTP
           BODY=$(jq -n --arg uri "$BACKUP_SAS_URI" --arg rr "$RESTORE_REGION" '{uri: $uri, restoreRegion: $rr}')
 
-          echo "Calling backup for ledger '${DEPLOYMENT_NAME}' in resource group '${RESOURCE_GROUP}' with body '$(BODY)'"
+          echo "Calling backup for ledger '${DEPLOYMENT_NAME}' in resource group '${RESOURCE_GROUP}' with body '${BODY}'"
           HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" -X POST "$URL" \
             -H "Authorization: Bearer $MANAGEMENT_TOKEN" \
             -H "Content-Type: application/json" \
