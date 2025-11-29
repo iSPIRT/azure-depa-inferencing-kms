@@ -51,6 +51,8 @@ jobs:
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           MI_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         run: |
+          set +e  # Don't exit on error, we want to continue diagnostics
+          
           if [ -z "$AKV_VAULT_NAME" ]; then
             echo "AKV_VAULT_NAME not set, skipping"
             exit 0
@@ -59,7 +61,12 @@ jobs:
           echo "=== Checking Key Vault Configuration ==="
           
           # Get tenant IDs (store in vars, don't print directly)
-          CURRENT_TENANT=$(az account show --query tenantId --output tsv)
+          CURRENT_TENANT=$(az account show --query tenantId --output tsv 2>/dev/null)
+          if [ -z "$CURRENT_TENANT" ]; then
+            echo "✗ Failed to get current tenant ID"
+            exit 1
+          fi
+          
           AKV_TENANT=$(az keyvault show --name $AKV_VAULT_NAME --query properties.tenantId --output tsv 2>/dev/null)
           ALLOWED_TENANTS=$(az keyvault show --name $AKV_VAULT_NAME --query properties.allowedTenantIds --output json 2>/dev/null)
           
@@ -84,7 +91,7 @@ jobs:
           fi
           
           # Check RBAC vs Access Policies
-          RBAC_ENABLED=$(az keyvault show --name $AKV_VAULT_NAME --query properties.enableRbacAuthorization --output tsv 2>/dev/null)
+          RBAC_ENABLED=$(az keyvault show --name $AKV_VAULT_NAME --query properties.enableRbacAuthorization --output tsv 2>/dev/null || echo "false")
           if [ "$RBAC_ENABLED" == "true" ]; then
             echo "ℹ Key Vault uses RBAC authorization"
             echo ""
@@ -126,6 +133,9 @@ jobs:
             echo "Error details:"
             echo "$TEST_OUTPUT" | head -5
           fi
+          
+          # Exit with success even if access test failed (diagnostics only)
+          exit 0
 
       - name: Get service certificate
         env:
