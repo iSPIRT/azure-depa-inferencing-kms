@@ -57,6 +57,8 @@ jobs:
           echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
           echo "KMS_SERVICE_CERT_PATH=$KMS_SERVICE_CERT_PATH" >> $GITHUB_ENV
+          export KMS_MEMBER_CERT_PATH=${KMS_WORKSPACE}/member_cert.pem
+          echo "KMS_MEMBER_CERT_PATH=${KMS_MEMBER_CERT_PATH}" >> $GITHUB_ENV
 
       - name: Get service certificate
         env:
@@ -72,13 +74,12 @@ jobs:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
           KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
         run: |
-          export KMS_MEMBER_CERT_PATH=${KMS_WORKSPACE}/member_cert.pem
           az keyvault certificate download \
             --file ${KMS_MEMBER_CERT_PATH} \
             --vault-name $AKV_VAULT_NAME \
             --name ${DEPLOYMENT_NAME}-member-cert
-          echo "KMS_MEMBER_CERT_PATH=${KMS_MEMBER_CERT_PATH}" >> $GITHUB_ENV
 
       - name: Install KMS application
         env:
