@@ -50,9 +50,9 @@ jobs:
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
         run: |
-          export WORKSPACE=~/$DEPLOYMENT_NAME.aclworkspace
-          mkdir -p $WORKSPACE/proposals
-          echo "KMS_WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
+          export KMS_WORKSPACE=~/$DEPLOYMENT_NAME.aclworkspace
+          mkdir -p $KMS_WORKSPACE/proposals
+          echo "KMS_WORKSPACE=$KMS_WORKSPACE" >> $GITHUB_ENV
           export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
           echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
