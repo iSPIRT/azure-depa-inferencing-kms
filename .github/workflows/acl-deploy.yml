@@ -46,6 +46,33 @@ jobs:
           az version
           az extension add --name confidentialledger --yes
 
+      - name: Diagnose Azure authentication
+        env:
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+        run: |
+          echo "=== Current Authentication ==="
+          CURRENT_TENANT=$(az account show --query tenantId --output tsv)
+          echo "Current account tenant ID: $CURRENT_TENANT"
+          echo ""
+          echo "Current account details:"
+          az account show --query "{tenantId:tenantId, subscriptionId:id, user:user.name}" --output table
+          echo ""
+          echo "=== Key Vault Configuration ==="
+          if [ -n "$AKV_VAULT_NAME" ]; then
+            echo "Checking Key Vault: $AKV_VAULT_NAME"
+            echo ""
+            echo "Key Vault tenant (where it was created):"
+            az keyvault show --name $AKV_VAULT_NAME --query properties.tenantId --output tsv 2>/dev/null || echo "Could not retrieve Key Vault tenant"
+            echo ""
+            echo "Allowed tenant IDs (if configured):"
+            az keyvault show --name $AKV_VAULT_NAME --query properties.allowedTenantIds --output json 2>/dev/null || echo "Could not retrieve allowed tenant IDs"
+            echo ""
+            echo "NOTE: If allowedTenantIds is null or empty, the Key Vault accepts tokens from any tenant."
+            echo "If it has specific values, only those tenants can authenticate."
+          else
+            echo "AKV_VAULT_NAME not set, skipping Key Vault diagnostics"
+          fi
+
       - name: Get service certificate
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
