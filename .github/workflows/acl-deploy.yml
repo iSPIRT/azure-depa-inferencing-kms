@@ -46,13 +46,6 @@ jobs:
           az version
           az extension add --name confidentialledger --yes
 
-      - name: Get service certificate
-        env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
-        run: |
-          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
-          | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
-
       - name: Setup environment variables
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
@@ -62,7 +55,18 @@ jobs:
           echo "KMS_WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
           export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
           echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
+          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
+          echo "KMS_SERVICE_CERT_PATH=$KMS_SERVICE_CERT_PATH" >> $GITHUB_ENV
 
+      - name: Get service certificate
+        env:
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
+          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
+        run: |
+          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
+          | jq -r '.ledgerTlsCertificate' > ${KMS_SERVICE_CERT_PATH}
+  
+  
       - name: Download member certificate from Key Vault
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
@@ -95,6 +99,7 @@ jobs:
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
+          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
         run: |
           make release-policy-set release-policy-proposal=./governance/proposals/set_key_release_policy_add.json
 
@@ -106,5 +111,6 @@ jobs:
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
+          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
         run: |
           make key-rotation-policy-set key-rotation-policy-proposal=./governance/proposals/set_key_rotation_policy.json
