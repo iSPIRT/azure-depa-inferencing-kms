@@ -13,17 +13,17 @@ on:
       deployment_name:
         type: string
         description: "Name of the deployment"
-        default: "depa-inferencing-kms"
+        default: "depa-inferencing-kms-prod-cin"
   workflow_call:
     inputs:
       deployment_name:
         type: string
         description: "Name of the deployment"
-        default: "depa-inferencing-kms"
+        default: "depa-inferencing-kms-prod-cin"
 
 jobs:
   deploy:
-    name: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
+    name: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
     runs-on: ubuntu-latest
     continue-on-error: false
     steps:
@@ -48,14 +48,14 @@ jobs:
 
       - name: Get service certificate
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
         run: |
           curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
           | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
 
       - name: Call refresh
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
         run: |
 
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem

@@ -10,17 +10,17 @@ on:
       deployment_name:
         type: string
         description: "Name of the deployment"
-        default: "depa-inferencing-kms"
+        default: "depa-inferencing-kms-prod-cin"
   workflow_call:
     inputs:
       deployment_name:
         type: string
         description: "Name of the deployment"
-        default: "depa-inferencing-kms"
+        default: "depa-inferencing-kms-prod-cin"
 
 jobs:
   deploy:
-    name: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
+    name: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
     runs-on: ubuntu-latest
     continue-on-error: false
     steps:
@@ -45,7 +45,7 @@ jobs:
 
       - name: Backup ledger
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
           SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
           STORAGE_ACCOUNT: ${{ secrets.AZURE_KMS_BACKUP_STORAGE_ACCOUNT }}
