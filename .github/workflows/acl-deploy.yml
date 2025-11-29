@@ -53,13 +53,15 @@ jobs:
           curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
           | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
 
-      - name: Create workspace
+      - name: Setup environment variables
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
         run: |
           export WORKSPACE=~/$DEPLOYMENT_NAME.aclworkspace
           mkdir -p $WORKSPACE/proposals
           echo "KMS_WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
+          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
+          echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
 
       - name: Install KMS application
         env:
