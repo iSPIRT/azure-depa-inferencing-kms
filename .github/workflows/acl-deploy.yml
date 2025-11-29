@@ -46,31 +46,85 @@ jobs:
           az version
           az extension add --name confidentialledger --yes
 
-      - name: Diagnose Azure authentication
+      - name: Diagnose and fix Key Vault tenant access
         env:
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          MI_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         run: |
-          echo "=== Current Authentication ==="
+          if [ -z "$AKV_VAULT_NAME" ]; then
+            echo "AKV_VAULT_NAME not set, skipping"
+            exit 0
+          fi
+          
+          echo "=== Checking Key Vault Configuration ==="
+          
+          # Get tenant IDs (store in vars, don't print directly)
           CURRENT_TENANT=$(az account show --query tenantId --output tsv)
-          echo "Current account tenant ID: $CURRENT_TENANT"
-          echo ""
-          echo "Current account details:"
-          az account show --query "{tenantId:tenantId, subscriptionId:id, user:user.name}" --output table
-          echo ""
-          echo "=== Key Vault Configuration ==="
-          if [ -n "$AKV_VAULT_NAME" ]; then
-            echo "Checking Key Vault: $AKV_VAULT_NAME"
-            echo ""
-            echo "Key Vault tenant (where it was created):"
-            az keyvault show --name $AKV_VAULT_NAME --query properties.tenantId --output tsv 2>/dev/null || echo "Could not retrieve Key Vault tenant"
-            echo ""
-            echo "Allowed tenant IDs (if configured):"
-            az keyvault show --name $AKV_VAULT_NAME --query properties.allowedTenantIds --output json 2>/dev/null || echo "Could not retrieve allowed tenant IDs"
-            echo ""
-            echo "NOTE: If allowedTenantIds is null or empty, the Key Vault accepts tokens from any tenant."
-            echo "If it has specific values, only those tenants can authenticate."
+          AKV_TENANT=$(az keyvault show --name $AKV_VAULT_NAME --query properties.tenantId --output tsv 2>/dev/null)
+          ALLOWED_TENANTS=$(az keyvault show --name $AKV_VAULT_NAME --query properties.allowedTenantIds --output json 2>/dev/null)
+          
+          # Check if tenants match
+          if [ "$CURRENT_TENANT" == "$AKV_TENANT" ]; then
+            echo "✓ Current tenant matches Key Vault tenant"
           else
-            echo "AKV_VAULT_NAME not set, skipping Key Vault diagnostics"
+            echo "⚠ Current tenant does NOT match Key Vault tenant"
+          fi
+          
+          # Check allowed tenant IDs configuration
+          if [ -z "$ALLOWED_TENANTS" ] || [ "$ALLOWED_TENANTS" == "null" ] || [ "$ALLOWED_TENANTS" == "[]" ]; then
+            echo "ℹ No tenant restrictions configured (Key Vault accepts all tenants)"
+          else
+            echo "ℹ Tenant restrictions are configured"
+            # Check if current tenant is in allowed list
+            if echo "$ALLOWED_TENANTS" | grep -q "$CURRENT_TENANT"; then
+              echo "✓ Current tenant is in allowed list"
+            else
+              echo "⚠ Current tenant is NOT in allowed list"
+            fi
+          fi
+          
+          # Check RBAC vs Access Policies
+          RBAC_ENABLED=$(az keyvault show --name $AKV_VAULT_NAME --query properties.enableRbacAuthorization --output tsv 2>/dev/null)
+          if [ "$RBAC_ENABLED" == "true" ]; then
+            echo "ℹ Key Vault uses RBAC authorization"
+            echo ""
+            echo "=== Checking RBAC Role Assignments ==="
+            
+            # Get the managed identity client ID from environment
+            VAULT_ID=$(az keyvault show --name $AKV_VAULT_NAME --query id --output tsv 2>/dev/null)
+            
+            if [ -n "$VAULT_ID" ] && [ -n "$MI_CLIENT_ID" ]; then
+              # Check if managed identity has any role assignments on the Key Vault
+              ROLE_ASSIGNMENTS=$(az role assignment list --scope "$VAULT_ID" --assignee "$MI_CLIENT_ID" --output json 2>/dev/null)
+              
+              if [ -n "$ROLE_ASSIGNMENTS" ] && [ "$ROLE_ASSIGNMENTS" != "[]" ]; then
+                echo "✓ Managed identity has role assignments on Key Vault"
+                # List the roles (without printing sensitive info)
+                echo "$ROLE_ASSIGNMENTS" | jq -r '.[].roleDefinitionName' 2>/dev/null | while read role; do
+                  echo "  - $role"
+                done || echo "  (could not list roles)"
+              else
+                echo "⚠ Managed identity does NOT have role assignments on Key Vault"
+              fi
+            else
+              echo "⚠ Could not determine Key Vault ID or Managed Identity Client ID"
+            fi
+          else
+            echo "ℹ Key Vault uses Access Policy authorization"
+          fi
+          
+          # Test actual access
+          echo ""
+          echo "=== Testing Key Vault Access ==="
+          TEST_OUTPUT=$(az keyvault key list --vault-name $AKV_VAULT_NAME 2>&1)
+          TEST_EXIT_CODE=$?
+          
+          if [ $TEST_EXIT_CODE -eq 0 ]; then
+            echo "✓ Key Vault access test successful"
+          else
+            echo "✗ Key Vault access test failed"
+            echo "Error details:"
+            echo "$TEST_OUTPUT" | head -5
           fi
 
       - name: Get service certificate
