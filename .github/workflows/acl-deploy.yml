@@ -81,6 +81,14 @@ jobs:
             --vault-name $AKV_VAULT_NAME \
             --name ${DEPLOYMENT_NAME}-member-cert
 
+      - name: Verify role assignments on the KV (optional, helpful)
+        env:
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          # adjust scope to your vault resource id if you want exact scope
+          az role assignment list --assignee "${{ secrets.AZURE_CLIENT_ID }}" --scope "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/$(az keyvault show -n ${AKV_VAULT_NAME} --query resourceGroup -o tsv)/providers/Microsoft.KeyVault/vaults/${AKV_VAULT_NAME}" -o json || true
+    
       - name: Set baseline key release policy
         env:
           KMS_URL: ${{ env.KMS_URL }}
