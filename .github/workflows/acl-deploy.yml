@@ -81,17 +81,6 @@ jobs:
             --vault-name $AKV_VAULT_NAME \
             --name ${DEPLOYMENT_NAME}-member-cert
 
-      - name: Install KMS application
-        env:
-          KMS_URL: ${{ env.KMS_URL }}
-          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
-          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
-          USE_AKV: "true"
-          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
-        run: |
-          make js-app-set
-
       - name: Set baseline key release policy
         env:
           KMS_URL: ${{ env.KMS_URL }}
