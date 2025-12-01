@@ -83,8 +83,8 @@ ccf-sign() {
             --name $AKV_KEY_NAME \
             --algorithm $alg \
             --digest $value \
-            --query result \
-            --output tsv)
+            -o json)
+        echo "Signature value: $sig_value"
         echo "Signature value length: ${#sig_value} characters"
         
         # Create the JSON response in the format expected by ccf_cose_sign1_finish
