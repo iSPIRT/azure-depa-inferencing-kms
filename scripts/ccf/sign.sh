@@ -16,6 +16,11 @@ ccf-sign() {
 
     set -x 
 
+    content=$1
+    msg_type=${2:-"proposal"}
+    extra_args="${@:3}"
+    USE_AKV=${USE_AKV:-"false"}
+
     echo "--------------------------------"
     echo "content: $content"
     echo "msg_type: $msg_type"
@@ -25,12 +30,9 @@ ccf-sign() {
     echo "KMS_MEMBER_PRIVK_PATH: $KMS_MEMBER_PRIVK_PATH"
     echo "AKV_VAULT_NAME: $AKV_VAULT_NAME"
     echo "AKV_KEY_NAME: $AKV_KEY_NAME"
+    cat $content
     echo "--------------------------------"
 
-    content=$1
-    msg_type=${2:-"proposal"}
-    extra_args="${@:3}"
-    USE_AKV=${USE_AKV:-"false"}
 
     if [[ "$USE_AKV" == "false" ]]; then
         ccf_cose_sign1 \
