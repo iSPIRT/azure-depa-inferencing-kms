@@ -115,7 +115,7 @@ jobs:
                   echo "$USER_DETAILS" | jq '{
                     userId: .userId,
                     assignedRoles: .assignedRoles,
-                    certificate: .certificate // "N/A (AAD-based user)"
+                    certificate: (if .certificate then .certificate else "N/A (AAD-based user)" end)
                   }'
                 else
                   # Fallback to list response data
