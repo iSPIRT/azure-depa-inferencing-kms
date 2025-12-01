@@ -16,6 +16,17 @@ ccf-sign() {
 
     set -x 
 
+    echo "--------------------------------"
+    echo "content: $content"
+    echo "msg_type: $msg_type"
+    echo "extra_args: $extra_args"
+    echo "USE_AKV: $USE_AKV"
+    echo "KMS_MEMBER_CERT_PATH: $KMS_MEMBER_CERT_PATH"
+    echo "KMS_MEMBER_PRIVK_PATH: $KMS_MEMBER_PRIVK_PATH"
+    echo "AKV_VAULT_NAME: $AKV_VAULT_NAME"
+    echo "AKV_KEY_NAME: $AKV_KEY_NAME"
+    echo "--------------------------------"
+
     content=$1
     msg_type=${2:-"proposal"}
     extra_args="${@:3}"
