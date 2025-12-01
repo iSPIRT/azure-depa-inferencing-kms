@@ -78,23 +78,14 @@ ccf-sign() {
         
         # Use az keyvault key sign to sign the data
         echo "Signing with Azure Key Vault..."
-        sig_value=$(az keyvault key sign \
+        signature=$(az keyvault key sign \
             --vault-name $AKV_VAULT_NAME \
             --name $AKV_KEY_NAME \
             --algorithm $alg \
-            --digest $value \
-            -o json)
-        echo "Signature value: $sig_value"
-        echo "Signature value length: ${#sig_value} characters"
-        
-        # Create the JSON response in the format expected by ccf_cose_sign1_finish
-        # Format: {"kid": "...", "value": "..."}
-        echo "{\"kid\":\"$AKV_URL\",\"value\":\"$sig_value\"}" > $signature
-        echo "Signature JSON saved to: $signature"
-        echo "Signature JSON content:"
-        echo "$(< $signature)"
-        echo ""
-        
+            --digest $value)
+        echo "Signature value: $signature"
+        echo "Signature value length: ${#signature} characters"
+                
         echo "Finishing COSE Sign1 document..."
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
