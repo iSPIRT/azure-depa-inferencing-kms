@@ -4,6 +4,9 @@
 # Licensed under the MIT license.
 
 proposals() {
+
+    set -x 
+    
     curl $KMS_URL/app/proposals \
         -X POST \
         -H "Content-Type: application/cose" \

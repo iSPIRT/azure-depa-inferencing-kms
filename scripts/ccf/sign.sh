@@ -12,6 +12,7 @@
 
 ccf-sign() {
 
+    set -e
     set -x 
 
     content=$1
@@ -42,7 +43,6 @@ ccf-sign() {
             --query key.kid \
             --output tsv)
 
-        echo "AKV_URL: $AKV_URL"
         signature=$(mktemp)
         ccf_cose_sign1_prepare \
             --ccf-gov-msg-type $msg_type \
@@ -55,7 +55,6 @@ ccf-sign() {
                 -H "Content-Type: application/json" \
                 "${AKV_URL}/sign?api-version=7.2" \
                 -d @- > $signature
-        echo "Signature: $(cat $signature)"
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
             --ccf-gov-msg-created_at $creation_time \
@@ -65,6 +64,8 @@ ccf-sign() {
             $extra_args
         rm -rf $signature
     fi
+
+    set +e
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
