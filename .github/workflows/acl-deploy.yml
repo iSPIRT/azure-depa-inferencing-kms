@@ -111,7 +111,7 @@ jobs:
         run: |
           echo "Digest (base64): ${{ steps.digest.outputs.digest }}"
           # az keyvault key sign expects the digest in base64 (some az versions); confirm with your az --help
-          az keyvault key sign --vault-name "${AKV_VAULT_NAME}" --name "${AKV_KEY_NAME}" --algorithm RS256 --digest "${{ steps.digest.outputs.digest }}" -o json > /tmp/sign_out.json
+          az keyvault key sign --vault-name "${AKV_VAULT_NAME}" --name "${AKV_KEY_NAME}" --algorithm ES384 --digest "${{ steps.digest.outputs.digest }}" -o json > /tmp/sign_out.json
           echo "Sign output:"
           cat /tmp/sign_out.json
           jq -r '.result' /tmp/sign_out.json | base64 --decode > /tmp/signature.bin || true
