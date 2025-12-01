@@ -81,17 +81,6 @@ jobs:
             --vault-name $AKV_VAULT_NAME \
             --name ${DEPLOYMENT_NAME}-member-cert
 
-      - name: Install KMS application
-        env:
-          KMS_URL: ${{ env.KMS_URL }}
-          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
-          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
-          USE_AKV: "true"
-          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
-        run: |
-          make js-app-set
-
       - name: Show Azure identity & context (sanity)
         run: |
           echo "==== az account show ===="
@@ -143,26 +132,3 @@ jobs:
           az keyvault key verify --vault-name "${AKV_VAULT_NAME}" --name "${AKV_KEY_NAME}" --algorithm RS256 --signature "$(jq -r '.result' /tmp/sign_out.json)" --value "${{ steps.digest.outputs.digest }}" -o json
           echo "If verify succeeded, the workflow has sign rights."
 
-      - name: Set baseline key release policy
-        env:
-          KMS_URL: ${{ env.KMS_URL }}
-          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
-          USE_AKV: "true"
-          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
-          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
-          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
-        run: |
-          make release-policy-set release-policy-proposal=./governance/proposals/set_key_release_policy_add.json
-
-      - name: Set baseline key rotation policy
-        env:
-          KMS_URL: ${{ env.KMS_URL }}
-          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
-          USE_AKV: "true"
-          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
-          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
-          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
-        run: |
-          make key-rotation-policy-set key-rotation-policy-proposal=./governance/proposals/set_key_rotation_policy.json
