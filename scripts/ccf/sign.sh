@@ -30,7 +30,7 @@ ccf-sign() {
     echo "KMS_MEMBER_PRIVK_PATH: $KMS_MEMBER_PRIVK_PATH"
     echo "AKV_VAULT_NAME: $AKV_VAULT_NAME"
     echo "AKV_KEY_NAME: $AKV_KEY_NAME"
-    cat $content
+    cat $content >> $GITHUB_OUTPUT
     echo "--------------------------------"
 
 
@@ -66,7 +66,7 @@ ccf-sign() {
             $extra_args > $prepared_data
         echo "Prepared data saved to: $prepared_data"
         echo "Prepared data content:"
-        cat $prepared_data
+        cat $prepared_data >> $GITHUB_OUTPUT
         echo ""
         
         # Extract algorithm and value from the JSON prepared data
@@ -92,7 +92,7 @@ ccf-sign() {
         echo "{\"kid\":\"$AKV_URL\",\"value\":\"$sig_value\"}" > $signature
         echo "Signature JSON saved to: $signature"
         echo "Signature JSON content:"
-        cat $signature
+        cat $signature >> $GITHUB_OUTPUT
         echo ""
         
         echo "Finishing COSE Sign1 document..."
