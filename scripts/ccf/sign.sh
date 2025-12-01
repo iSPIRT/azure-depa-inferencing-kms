@@ -31,11 +31,6 @@ ccf-sign() {
             $extra_args
     else
         creation_time=$(date -u +"%Y-%m-%dT%H:%M:%S")
-        bearer_token=$( \
-            az account get-access-token \
-            --resource https://vault.azure.net \
-            --query accessToken --output tsv \
-        )
 
         export AKV_URL=$( \
             az keyvault key show \
@@ -43,19 +38,51 @@ ccf-sign() {
             --name $AKV_KEY_NAME \
             --query key.kid \
             --output tsv)
+        echo "AKV_URL: $AKV_URL"
 
+        # Prepare the data to be signed and save to temp file
+        prepared_data=$(mktemp)
         signature=$(mktemp)
+        
+        echo "Preparing COSE Sign1 data..."
         ccf_cose_sign1_prepare \
             --ccf-gov-msg-type $msg_type \
             --ccf-gov-msg-created_at $creation_time \
             --content $content \
             --signing-cert ${KMS_MEMBER_CERT_PATH} \
-            $extra_args \
-            | curl -X POST -s \
-                -H "Authorization: Bearer $bearer_token" \
-                -H "Content-Type: application/json" \
-                "${AKV_URL}/sign?api-version=7.2" \
-                -d @- > $signature
+            $extra_args > $prepared_data
+        echo "Prepared data saved to: $prepared_data"
+        echo "Prepared data content:"
+        cat $prepared_data
+        echo ""
+        
+        # Extract algorithm and value from the JSON prepared data
+        # The prepared data is JSON with format: {"alg": "...", "value": "base64..."}
+        alg=$(jq -r '.alg' $prepared_data)
+        value=$(jq -r '.value' $prepared_data)
+        echo "Extracted algorithm: $alg"
+        echo "Extracted value length: ${#value} characters"
+        
+        # Use az keyvault key sign to sign the data
+        echo "Signing with Azure Key Vault..."
+        sig_value=$(az keyvault key sign \
+            --vault-name $AKV_VAULT_NAME \
+            --name $AKV_KEY_NAME \
+            --algorithm $alg \
+            --value $value \
+            --query value \
+            --output tsv)
+        echo "Signature value length: ${#sig_value} characters"
+        
+        # Create the JSON response in the format expected by ccf_cose_sign1_finish
+        # Format: {"kid": "...", "value": "..."}
+        echo "{\"kid\":\"$AKV_URL\",\"value\":\"$sig_value\"}" > $signature
+        echo "Signature JSON saved to: $signature"
+        echo "Signature JSON content:"
+        cat $signature
+        echo ""
+        
+        echo "Finishing COSE Sign1 document..."
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
             --ccf-gov-msg-created_at $creation_time \
@@ -63,7 +90,8 @@ ccf-sign() {
             --signing-cert ${KMS_MEMBER_CERT_PATH} \
             --signature $signature \
             $extra_args
-        rm -rf $signature
+        
+        rm -rf $prepared_data $signature
     fi
 }
 
