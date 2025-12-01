@@ -82,7 +82,8 @@ ccf-sign() {
             --vault-name $AKV_VAULT_NAME \
             --name $AKV_KEY_NAME \
             --algorithm $alg \
-            --digest $value)
+            --digest $value \
+            | jq -r '.signature')
         echo "Signature value: $signature"
         echo "Signature value length: ${#signature} characters"
                 
