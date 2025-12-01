@@ -62,8 +62,12 @@ jobs:
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
           export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
           export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
+
+          echo "=== Current Key Release Policy ==="
           curl ${KMS_URL}/app/keyReleasePolicy --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+
+            echo "=== Current Settings Policy ==="
           curl ${KMS_URL}/app/settingsPolicy --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
 
@@ -85,46 +89,7 @@ jobs:
           export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
           
           echo "=== List of all ledger users ==="
-          USERS_RESPONSE=$(curl -s ${KMS_URL}/app/ledgerUsers?api-version=2024-08-22-preview --cacert ${KMS_SERVICE_CERT_PATH} \
+          USERS_RESPONSE=$(curl -s ${KMS_URL}/app/users?api-version=2024-08-22-preview --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json")
           echo "$USERS_RESPONSE" | jq
           
-          echo ""
-          echo "=== Detailed user information with certificates and roles ==="
-          # Extract user IDs from the ledgerUsers array
-          USER_IDS=$(echo "$USERS_RESPONSE" | jq -r '.ledgerUsers[]?.userId // empty' 2>/dev/null)
-          
-          if [ -z "$USER_IDS" ]; then
-            echo "No users found in the ledger."
-          else
-            # Process each user to get detailed information including certificates
-            for USER_ID in $USER_IDS; do
-              if [ -n "$USER_ID" ] && [ "$USER_ID" != "null" ]; then
-                echo ""
-                echo "--- User: $USER_ID ---"
-                # Get user details from list response
-                USER_INFO=$(echo "$USERS_RESPONSE" | jq --arg uid "$USER_ID" '.ledgerUsers[] | select(.userId == $uid)')
-                
-                # Try to get additional details from individual user endpoint (may include certificate)
-                ENCODED_USER_ID=$(printf '%s' "$USER_ID" | jq -sRr @uri)
-                USER_DETAILS=$(curl -s ${KMS_URL}/app/ledgerUsers/${ENCODED_USER_ID}?api-version=2024-08-22-preview --cacert ${KMS_SERVICE_CERT_PATH} \
-                  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" 2>/dev/null)
-                
-                # Merge information: use individual endpoint details if available, otherwise use list response
-                if [ -n "$USER_DETAILS" ] && echo "$USER_DETAILS" | jq -e . >/dev/null 2>&1; then
-                  echo "$USER_DETAILS" | jq '{
-                    userId: .userId,
-                    assignedRoles: .assignedRoles,
-                    certificate: (if .certificate then .certificate else "N/A (AAD-based user)" end)
-                  }'
-                else
-                  # Fallback to list response data
-                  echo "$USER_INFO" | jq '{
-                    userId: .userId,
-                    assignedRoles: .assignedRoles,
-                    certificate: "N/A (AAD-based user or certificate not available via API)"
-                  }'
-                fi
-              fi
-            done
-          fi
