@@ -55,7 +55,7 @@ ccf-sign() {
                 -H "Content-Type: application/json" \
                 "${AKV_URL}/sign?api-version=7.2" \
                 -d @- > $signature
-        echo "Signature: $signature"
+        echo "Signature: $(cat $signature)"
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
             --ccf-gov-msg-created_at $creation_time \
