@@ -44,9 +44,6 @@ ccf-sign() {
             --query key.kid \
             --output tsv)
 
-        echo "KMS_MEMBER_CERT_PATH: ${KMS_MEMBER_CERT_PATH}"
-        cat ${KMS_MEMBER_CERT_PATH}
-
         signature=$(mktemp)
         ccf_cose_sign1_prepare \
             --ccf-gov-msg-type $msg_type \

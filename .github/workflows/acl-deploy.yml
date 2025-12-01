@@ -71,7 +71,7 @@ jobs:
   
       - name: Download member certificate from Key Vault
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
           KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
@@ -80,6 +80,10 @@ jobs:
             --file ${KMS_MEMBER_CERT_PATH} \
             --vault-name $AKV_VAULT_NAME \
             --name ${DEPLOYMENT_NAME}-member-cert
+          echo "KMS_MEMBER_CERT_PATH: ${KMS_MEMBER_CERT_PATH}"
+          echo "--------------------------------"
+          cat ${KMS_MEMBER_CERT_PATH}
+          echo "--------------------------------"
 
       - name: Verify role assignments on the KV (optional, helpful)
         env:
