@@ -10,9 +10,10 @@
 #    given the payload and signing cert, then uses AKV to sign the JSON output, and
 #    then finally calling finish to output the final COSE Sign1 document.
 
+set -eEo pipefail
+
 ccf-sign() {
 
-    set -e
     set -x 
 
     content=$1
@@ -43,6 +44,9 @@ ccf-sign() {
             --query key.kid \
             --output tsv)
 
+        echo "KMS_MEMBER_CERT_PATH: ${KMS_MEMBER_CERT_PATH}"
+        cat ${KMS_MEMBER_CERT_PATH}
+
         signature=$(mktemp)
         ccf_cose_sign1_prepare \
             --ccf-gov-msg-type $msg_type \
@@ -64,8 +68,6 @@ ccf-sign() {
             $extra_args
         rm -rf $signature
     fi
-
-    set +e
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
