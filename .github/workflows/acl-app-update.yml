@@ -10,13 +10,13 @@ on:
       deployment_name:
         type: string
         description: "Name of the deployment"
-        default: "depa-inferencing-kms"
+        default: "depa-inferencing-kms-prod-cin"
   workflow_call:
     inputs:
       deployment_name:
         type: string
         description: "Name of the deployment"
-        default: "depa-inferencing-kms"
+        default: "depa-inferencing-kms-prod-cin"
 
 jobs:
   deploy:
