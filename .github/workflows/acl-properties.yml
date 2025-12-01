@@ -75,3 +75,13 @@ jobs:
           export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
           curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Content-Type: application/json" -w '\n' | jq
+
+      - name: List ledger users
+        env:
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+        run: |
+          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
+          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
+          export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
+          curl ${KMS_URL}/app/ledgerUsers?api-version=2024-08-22-preview --cacert ${KMS_SERVICE_CERT_PATH} \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
