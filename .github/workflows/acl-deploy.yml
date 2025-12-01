@@ -96,13 +96,15 @@ jobs:
           # adjust scope to your vault resource id if you want exact scope
           az role assignment list --assignee "${{ secrets.AZURE_CLIENT_ID }}" --scope "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/$(az keyvault show -n ${AKV_VAULT_NAME} --query resourceGroup -o tsv)/providers/Microsoft.KeyVault/vaults/${AKV_VAULT_NAME}" -o json || true
 
-      - name: Create a test SHA256 digest
+      - name: Create a test SHA-384 digest (base64)
         id: digest
         run: |
-          # create deterministic payload -> sha256 digest (base64)
-          echo -n "test-signing-payload" > /tmp/payload.bin
-          DIGEST_B64=$(openssl dgst -sha256 -binary /tmp/payload.bin | base64)
+          # deterministic payload
+          echo -n "test-signing-payload-es384" > /tmp/payload.bin
+          # compute binary SHA-384 digest, then base64 encode
+          DIGEST_B64=$(openssl dgst -sha384 -binary /tmp/payload.bin | base64)
           echo "digest=${DIGEST_B64}" >> $GITHUB_OUTPUT
+          echo "Digest (base64): ${DIGEST_B64}"
 
       - name: Sign digest with Key Vault key
         env:
