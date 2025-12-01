@@ -83,7 +83,7 @@ ccf-sign() {
             --name $AKV_KEY_NAME \
             --algorithm $alg \
             --digest $value \
-            --query value \
+            --query result \
             --output tsv)
         echo "Signature value length: ${#sig_value} characters"
         
