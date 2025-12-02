@@ -53,7 +53,7 @@ ccf-sign() {
         # Use Azure Key Vault REST API to sign the data
         # The REST API expects the full JSON payload from ccf_cose_sign1_prepare
         # and returns {"kid": "...", "value": "..."} which is what ccf_cose_sign1_finish expects
-        echo "Signing with Azure Key Vault REST API..."
+        echo "Signing with Azure Key Vault REST API..." >&2
         
         # Get access token for Key Vault
         bearer_token=$(az account get-access-token \
@@ -63,9 +63,9 @@ ccf-sign() {
         
         # Call the REST API sign endpoint with the prepared data
         # The API expects the full JSON: {"alg": "...", "value": "..."}
-        echo "Prepared data being sent to Azure Key Vault:"
-        jq . $prepared_data 2>/dev/null || (head -c 1000 $prepared_data && echo "...")
-        echo ""
+        echo "Prepared data being sent to Azure Key Vault:" >&2
+        jq . $prepared_data >&2 2>/dev/null || (head -c 1000 $prepared_data >&2 && echo "..." >&2)
+        echo "" >&2
         
         http_code=$(curl -X POST -s -w "%{http_code}" \
             -H "Authorization: Bearer $bearer_token" \
@@ -74,13 +74,13 @@ ccf-sign() {
             --data @$prepared_data \
             -o $signature)
         
-        echo "Azure Key Vault HTTP response code: $http_code"
+        echo "Azure Key Vault HTTP response code: $http_code" >&2
         
         # Check for HTTP errors
         if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
             echo "ERROR: Azure Key Vault returned HTTP $http_code" >&2
             echo "Response body:" >&2
-            jq . $signature 2>/dev/null || (head -c 1000 $signature && echo "...")
+            jq . $signature >&2 2>/dev/null || (head -c 1000 $signature >&2 && echo "..." >&2)
             echo "" >&2
             rm -f $prepared_data $signature
             exit 1
@@ -97,7 +97,7 @@ ccf-sign() {
         if ! jq empty $signature 2>/dev/null; then
             echo "ERROR: Signature response is not valid JSON" >&2
             echo "Response content (first 500 chars):" >&2
-            head -c 500 $signature
+            head -c 500 $signature >&2
             echo "" >&2
             rm -f $prepared_data $signature
             exit 1
@@ -121,7 +121,7 @@ ccf-sign() {
         sig_value_len=$(jq -r '.value | length' $signature)
         echo "Signature value length: $sig_value_len characters" >&2
 
-        echo "Finishing COSE Sign1 document..."
+        echo "Finishing COSE Sign1 document..." >&2
         cose_output=$(mktemp)
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
