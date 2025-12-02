@@ -103,9 +103,9 @@ ccf-sign() {
             exit 1
         fi
         
-        echo "Signature retrieved from Azure Key Vault:"
-        jq . $signature
-        echo ""
+        echo "Signature retrieved from Azure Key Vault:" >&2
+        jq . $signature >&2
+        echo "" >&2
         
         # Verify the signature has the expected format
         if ! jq -e '.kid and .value' $signature >/dev/null 2>&1; then
@@ -116,6 +116,10 @@ ccf-sign() {
             rm -f $prepared_data $signature
             exit 1
         fi
+        
+        # Log signature value length for debugging
+        sig_value_len=$(jq -r '.value | length' $signature)
+        echo "Signature value length: $sig_value_len characters" >&2
 
         echo "Finishing COSE Sign1 document..."
         cose_output=$(mktemp)
@@ -135,27 +139,35 @@ ccf-sign() {
         fi
         
         cose_size=$(wc -c < $cose_output)
-        echo "COSE Sign1 document size: $cose_size bytes"
+        echo "COSE Sign1 document size: $cose_size bytes" >&2
         
-        # Show first bytes in hex (portable method) - output to stderr to avoid interfering with binary output
+        # Show first and last bytes in hex for debugging
         if command -v od >/dev/null 2>&1; then
             echo "First 64 bytes (hex):" >&2
             head -c 64 $cose_output | od -An -tx1 | head -n 4 >&2
+            echo "Last 32 bytes (hex):" >&2
+            tail -c 32 $cose_output | od -An -tx1 >&2
         elif command -v hexdump >/dev/null 2>&1; then
             echo "First 64 bytes (hex):" >&2
             head -c 64 $cose_output | hexdump -C | head -n 4 >&2
-        else
-            echo "First 64 bytes (base64):" >&2
-            head -c 64 $cose_output | base64 -w 0 >&2
-            echo "" >&2
+            echo "Last 32 bytes (hex):" >&2
+            tail -c 32 $cose_output | hexdump -C >&2
         fi
         echo "" >&2
+        
+        # Verify the document starts with COSE_Sign1 tag (0xd2)
+        first_byte=$(head -c 1 $cose_output | od -An -tx1 | tr -d ' \n')
+        if [[ "$first_byte" != "d2" ]]; then
+            echo "ERROR: COSE document does not start with COSE_Sign1 tag (expected 0xd2, got 0x$first_byte)" >&2
+            rm -f $prepared_data $signature $cose_output
+            exit 1
+        fi
         
         # Output the COSE Sign1 document (binary data to stdout)
         # Must be pure binary - no extra output
         if [[ $cose_size -gt 0 ]]; then
-            # Use dd with status=none to avoid any output, fallback to head
-            dd if=$cose_output of=/dev/stdout bs=4096 status=none 2>/dev/null || head -c $cose_size $cose_output
+            # Use head with exact byte count for reliable binary output
+            head -c $cose_size $cose_output
         else
             echo "ERROR: COSE output is empty" >&2
             rm -f $prepared_data $signature $cose_output
