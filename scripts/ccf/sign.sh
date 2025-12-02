@@ -21,19 +21,6 @@ ccf-sign() {
     extra_args="${@:3}"
     USE_AKV=${USE_AKV:-"false"}
 
-    echo "--------------------------------"
-    echo "content: $content"
-    echo "msg_type: $msg_type"
-    echo "extra_args: $extra_args"
-    echo "USE_AKV: $USE_AKV"
-    echo "KMS_MEMBER_CERT_PATH: $KMS_MEMBER_CERT_PATH"
-    echo "KMS_MEMBER_PRIVK_PATH: $KMS_MEMBER_PRIVK_PATH"
-    echo "AKV_VAULT_NAME: $AKV_VAULT_NAME"
-    echo "AKV_KEY_NAME: $AKV_KEY_NAME"
-    echo "$(< $content)"
-    echo "--------------------------------"
-
-
     if [[ "$USE_AKV" == "false" ]]; then
         ccf_cose_sign1 \
             --content $content \
@@ -51,43 +38,48 @@ ccf-sign() {
             --name $AKV_KEY_NAME \
             --query key.kid \
             --output tsv)
-        echo "AKV_URL: $AKV_URL"
 
         # Prepare the data to be signed and save to temp file
         prepared_data=$(mktemp)
         signature=$(mktemp)
         
-        echo "Preparing COSE Sign1 data..."
         ccf_cose_sign1_prepare \
             --ccf-gov-msg-type $msg_type \
             --ccf-gov-msg-created_at $creation_time \
             --content $content \
             --signing-cert ${KMS_MEMBER_CERT_PATH} \
             $extra_args > $prepared_data
-        echo "Prepared data saved to: $prepared_data"
-        echo "Prepared data content:"
-        echo "$(< $prepared_data)"
+        
+        # Use Azure Key Vault REST API to sign the data
+        # The REST API expects the full JSON payload from ccf_cose_sign1_prepare
+        # and returns {"kid": "...", "value": "..."} which is what ccf_cose_sign1_finish expects
+        echo "Signing with Azure Key Vault REST API..."
+        
+        # Get access token for Key Vault
+        bearer_token=$(az account get-access-token \
+            --resource https://vault.azure.net \
+            --query accessToken \
+            --output tsv)
+        
+        # Call the REST API sign endpoint with the prepared data
+        # The API expects the full JSON: {"alg": "...", "value": "..."}
+        curl -X POST -s \
+            -H "Authorization: Bearer $bearer_token" \
+            -H "Content-Type: application/json" \
+            "${AKV_URL}/sign?api-version=7.2" \
+            --data @$prepared_data > $signature
+        
+        # Verify the signature was retrieved
+        if [[ ! -s "$signature" ]]; then
+            echo "ERROR: Signature file is empty after signing" >&2
+            rm -f $prepared_data $signature
+            exit 1
+        fi
+        
+        echo "Signature retrieved from Azure Key Vault:"
+        cat $signature
         echo ""
-        
-        # Extract algorithm and value from the JSON prepared data
-        # The prepared data is JSON with format: {"alg": "...", "value": "base64..."}
-        alg=$(jq -r '.alg' $prepared_data)
-        value=$(jq -r '.value' $prepared_data)
-        echo "Extracted algorithm: $alg"
-        echo "Extracted value length: ${#value} characters"
-        
-        # Use az keyvault key sign to sign the data
-        echo "Signing with Azure Key Vault..."
-        sig_value=$(az keyvault key sign \
-            --vault-name $AKV_VAULT_NAME \
-            --name $AKV_KEY_NAME \
-            --algorithm $alg \
-            --digest $value \
-            | jq -r '.signature')
-        echo "Signature value: $sig_value"
-        echo "Signature value length: ${#sig_value} characters"
-        echo "{\"kid\":\"$AKV_URL\",\"value\":\"$sig_value\"}" > $signature
-        
+
         echo "Finishing COSE Sign1 document..."
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
