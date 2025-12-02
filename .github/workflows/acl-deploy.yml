@@ -68,7 +68,6 @@ jobs:
           curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
           | jq -r '.ledgerTlsCertificate' > ${KMS_SERVICE_CERT_PATH}
   
-  
       - name: Download member certificate from Key Vault
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
@@ -81,15 +80,39 @@ jobs:
             --vault-name $AKV_VAULT_NAME \
             --name ${DEPLOYMENT_NAME}-member-cert
 
+      - name: Register managed identity as AAD-based Administrator
+        env:
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
+          KMS_URL: ${{ env.KMS_URL }}
+          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
+        run: |
+          # Get Azure account/subscription ID (AAD principal ID)
+          AAD_PRINCIPAL_ID=$(az account show --query id --output tsv)
+          echo "AAD Principal ID (Azure subscription ID): $AAD_PRINCIPAL_ID"
+          
+          # Get access token for Confidential Ledger
+          BEARER_TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com --query accessToken --output tsv)
+          
+          # Register the managed identity with Administrator role using ledgerUsers API
+          curl ${KMS_URL}/app/ledgerUsers/${AAD_PRINCIPAL_ID}?api-version=2024-08-22-preview \
+            --cacert ${KMS_SERVICE_CERT_PATH} \
+            -X PATCH \
+            -H "Content-Type: application/merge-patch+json" \
+            -H "Authorization: Bearer ${BEARER_TOKEN}" \
+            -d "$(jq -n --arg principal_id "$AAD_PRINCIPAL_ID" '{
+              user_id: $principal_id,
+              assignedRoles: ["Administrator"]
+            }')" | jq .
+
       - name: Register member certificate with Administrator role
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
           KMS_URL: ${{ env.KMS_URL }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
         run: |
           # Get certificate fingerprint (member ID)
-          MEMBER_ID=$(openssl x509 -in ${KMS_MEMBER_CERT_PATH} -noout -fingerprint -sha256 | cut -d "=" -f 2 | sed 's/://g' | awk '{print tolower($0)}')
+          MEMBER_ID=$(openssl x509 -in ${KMS_MEMBER_CERT_PATH} -noout -fingerprint -sha256 | cut -d "=" -f 2)
           echo "Member ID (certificate fingerprint): $MEMBER_ID"
           
           # Get access token for Confidential Ledger
@@ -105,6 +128,22 @@ jobs:
               user_id: $member_id,
               assignedRoles: ["Administrator"]
             }')" | jq .
+
+      - name: List all ledger users
+        env:
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
+          KMS_URL: ${{ env.KMS_URL }}
+          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
+        run: |
+          # Get access token for Confidential Ledger
+          BEARER_TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com --query accessToken --output tsv)
+          
+          # List all users in the ledger
+          echo "Listing all users in the ledger:"
+          curl ${KMS_URL}/app/ledgerUsers?api-version=2024-08-22-preview \
+            --cacert ${KMS_SERVICE_CERT_PATH} \
+            -H "Authorization: Bearer ${BEARER_TOKEN}" \
+            | jq .
 
       - name: Set baseline key release policy
         env:
