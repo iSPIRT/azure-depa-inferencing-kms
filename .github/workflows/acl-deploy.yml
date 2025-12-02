@@ -1,4 +1,4 @@
-name: Set default policies
+name: Initialize the KMS
 
 permissions:
   id-token: write
@@ -129,21 +129,13 @@ jobs:
               assignedRoles: ["Administrator"]
             }')" | jq .
 
-      - name: List all ledger users
+      - name: Install KMS application
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
           KMS_URL: ${{ env.KMS_URL }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
         run: |
-          # Get access token for Confidential Ledger
-          BEARER_TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com --query accessToken --output tsv)
-          
-          # List all users in the ledger
-          echo "Listing all users in the ledger:"
-          curl ${KMS_URL}/app/ledgerUsers?api-version=2024-08-22-preview \
-            --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer ${BEARER_TOKEN}" \
-            | jq .
+          make js-app-set
 
       - name: Set baseline key release policy
         env:
