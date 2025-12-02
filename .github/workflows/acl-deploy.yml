@@ -79,7 +79,7 @@ jobs:
           az keyvault certificate download \
             --file ${KMS_MEMBER_CERT_PATH} \
             --vault-name $AKV_VAULT_NAME \
-            --name ${DEPLOYMENT_NAME}-member-cert
+            --name ${DEPLOYMENT_NAME}-member0
 
       - name: Set baseline key release policy
         env:
@@ -87,7 +87,7 @@ jobs:
           KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           USE_AKV: "true"
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
+          AKV_KEY_NAME: ${{ inputs.deployment_name }}-member0
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
         run: |
