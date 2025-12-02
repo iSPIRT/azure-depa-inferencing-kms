@@ -166,7 +166,7 @@ ccf-sign() {
         # Output the COSE Sign1 document (binary data to stdout)
         # Must be pure binary - no extra output
         if [[ $cose_size -gt 0 ]]; then
-            # Use head with exact byte count for reliable binary output
+            # Use head with exact byte count fproor reliable binary output
             head -c $cose_size $cose_output
         else
             echo "ERROR: COSE output is empty" >&2
