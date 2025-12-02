@@ -63,11 +63,28 @@ ccf-sign() {
         
         # Call the REST API sign endpoint with the prepared data
         # The API expects the full JSON: {"alg": "...", "value": "..."}
-        curl -X POST -s \
+        echo "Prepared data being sent to Azure Key Vault:"
+        cat $prepared_data
+        echo ""
+        
+        http_code=$(curl -X POST -s -w "%{http_code}" \
             -H "Authorization: Bearer $bearer_token" \
             -H "Content-Type: application/json" \
             "${AKV_URL}/sign?api-version=7.2" \
-            --data @$prepared_data > $signature
+            --data @$prepared_data \
+            -o $signature)
+        
+        echo "Azure Key Vault HTTP response code: $http_code"
+        
+        # Check for HTTP errors
+        if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
+            echo "ERROR: Azure Key Vault returned HTTP $http_code" >&2
+            echo "Response body:" >&2
+            cat $signature >&2
+            echo "" >&2
+            rm -f $prepared_data $signature
+            exit 1
+        fi
         
         # Verify the signature was retrieved
         if [[ ! -s "$signature" ]]; then
@@ -76,20 +93,57 @@ ccf-sign() {
             exit 1
         fi
         
+        # Verify it's valid JSON
+        if ! jq empty $signature 2>/dev/null; then
+            echo "ERROR: Signature response is not valid JSON" >&2
+            echo "Response content:" >&2
+            cat $signature >&2
+            echo "" >&2
+            rm -f $prepared_data $signature
+            exit 1
+        fi
+        
         echo "Signature retrieved from Azure Key Vault:"
-        cat $signature
+        cat $signature | jq .
         echo ""
+        
+        # Verify the signature has the expected format
+        if ! jq -e '.kid and .value' $signature >/dev/null 2>&1; then
+            echo "ERROR: Signature response missing 'kid' or 'value' fields" >&2
+            echo "Response content:" >&2
+            cat $signature | jq . >&2
+            echo "" >&2
+            rm -f $prepared_data $signature
+            exit 1
+        fi
 
         echo "Finishing COSE Sign1 document..."
+        cose_output=$(mktemp)
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
             --ccf-gov-msg-created_at $creation_time \
             --content $content \
             --signing-cert ${KMS_MEMBER_CERT_PATH} \
             --signature $signature \
-            $extra_args
+            $extra_args > $cose_output
         
-        rm -rf $prepared_data $signature
+        # Check if ccf_cose_sign1_finish produced output
+        if [[ ! -s "$cose_output" ]]; then
+            echo "ERROR: ccf_cose_sign1_finish produced no output" >&2
+            rm -f $prepared_data $signature $cose_output
+            exit 1
+        fi
+        
+        echo "COSE Sign1 document size: $(wc -c < $cose_output) bytes"
+        echo "First 100 bytes (hex):"
+        head -c 100 $cose_output | xxd -p | head -c 200
+        echo ""
+        echo ""
+        
+        # Output the COSE Sign1 document
+        cat $cose_output
+        
+        rm -rf $prepared_data $signature $cose_output
     fi
 }
 
