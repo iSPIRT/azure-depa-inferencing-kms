@@ -137,24 +137,25 @@ ccf-sign() {
         cose_size=$(wc -c < $cose_output)
         echo "COSE Sign1 document size: $cose_size bytes"
         
-        # Show first bytes in hex (portable method)
+        # Show first bytes in hex (portable method) - output to stderr to avoid interfering with binary output
         if command -v od >/dev/null 2>&1; then
-            echo "First 64 bytes (hex):"
-            head -c 64 $cose_output | od -An -tx1 | head -n 4
+            echo "First 64 bytes (hex):" >&2
+            head -c 64 $cose_output | od -An -tx1 | head -n 4 >&2
         elif command -v hexdump >/dev/null 2>&1; then
-            echo "First 64 bytes (hex):"
-            head -c 64 $cose_output | hexdump -C | head -n 4
+            echo "First 64 bytes (hex):" >&2
+            head -c 64 $cose_output | hexdump -C | head -n 4 >&2
         else
-            echo "First 64 bytes (base64):"
-            head -c 64 $cose_output | base64 -w 0
-            echo ""
+            echo "First 64 bytes (base64):" >&2
+            head -c 64 $cose_output | base64 -w 0 >&2
+            echo "" >&2
         fi
-        echo ""
+        echo "" >&2
         
         # Output the COSE Sign1 document (binary data to stdout)
-        # Use dd or head to avoid cat issues in GitHub Actions
+        # Must be pure binary - no extra output
         if [[ $cose_size -gt 0 ]]; then
-            dd if=$cose_output bs=4096 2>/dev/null || head -c $cose_size $cose_output
+            # Use dd with status=none to avoid any output, fallback to head
+            dd if=$cose_output of=/dev/stdout bs=4096 status=none 2>/dev/null || head -c $cose_size $cose_output
         else
             echo "ERROR: COSE output is empty" >&2
             rm -f $prepared_data $signature $cose_output
