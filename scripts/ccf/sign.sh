@@ -31,6 +31,11 @@ ccf-sign() {
             $extra_args
     else
         creation_time=$(date -u +"%Y-%m-%dT%H:%M:%S")
+        bearer_token=$( \
+            az account get-access-token \
+            --resource https://vault.azure.net \
+            --query accessToken --output tsv \
+        )
 
         export AKV_URL=$( \
             az keyvault key show \
@@ -39,69 +44,26 @@ ccf-sign() {
             --query key.kid \
             --output tsv)
 
-        # Prepare the data to be signed and save to temp file
-        prepared_data=$(mktemp)
         signature=$(mktemp)
-        
         ccf_cose_sign1_prepare \
             --ccf-gov-msg-type $msg_type \
             --ccf-gov-msg-created_at $creation_time \
             --content $content \
             --signing-cert ${KMS_MEMBER_CERT_PATH} \
-            $extra_args > $prepared_data
-        
-        # Use Azure Key Vault REST API to sign the data
-        # The REST API expects the full JSON payload from ccf_cose_sign1_prepare
-        # and returns {"kid": "...", "value": "..."} which is what ccf_cose_sign1_finish expects
-        # Get access token for Key Vault
-        bearer_token=$(az account get-access-token \
-            --resource https://vault.azure.net \
-            --query accessToken \
-            --output tsv)
-        
-        # Call the REST API sign endpoint with the prepared data
-        # The API expects the full JSON: {"alg": "...", "value": "..."}
-        http_code=$(curl -X POST -s -w "%{http_code}" \
-            -H "Authorization: Bearer $bearer_token" \
-            -H "Content-Type: application/json" \
-            "${AKV_URL}/sign?api-version=7.2" \
-            --data @$prepared_data \
-            -o $signature)
-        
-        if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
-            echo "ERROR: Azure Key Vault returned HTTP $http_code" >&2
-            jq . $signature >&2 2>/dev/null || cat $signature >&2
-            echo "" >&2
-        fi
-        
-        # Verify the signature was retrieved and is valid JSON
-        if [[ ! -s "$signature" ]] || ! jq -e '.kid and .value' $signature >/dev/null 2>&1; then
-            echo "ERROR: Invalid signature response from Azure Key Vault" >&2
-            jq . $signature >&2 2>/dev/null || cat $signature >&2
-            echo "" >&2
-            rm -f $prepared_data $signature
-            exit 1
-        fi
-        cose_output=$(mktemp)
+            $extra_args \
+            | curl -X POST -s \
+                -H "Authorization: Bearer $bearer_token" \
+                -H "Content-Type: application/json" \
+                "${AKV_URL}/sign?api-version=7.2" \
+                -d @- > $signature
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
             --ccf-gov-msg-created_at $creation_time \
             --content $content \
             --signing-cert ${KMS_MEMBER_CERT_PATH} \
             --signature $signature \
-            $extra_args > $cose_output
-        
-        # Check if ccf_cose_sign1_finish produced output
-        if [[ ! -s "$cose_output" ]]; then
-            echo "ERROR: ccf_cose_sign1_finish produced no output" >&2
-            rm -f $prepared_data $signature $cose_output
-            exit 1
-        fi
-        
-        # Output the COSE Sign1 document (binary data to stdout)
-        head -c $(wc -c < $cose_output) $cose_output
-        
-        rm -rf $prepared_data $signature $cose_output
+            $extra_args
+        rm -rf $signature
     fi
 }
 
