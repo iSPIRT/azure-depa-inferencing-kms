@@ -64,7 +64,7 @@ ccf-sign() {
         # Call the REST API sign endpoint with the prepared data
         # The API expects the full JSON: {"alg": "...", "value": "..."}
         echo "Prepared data being sent to Azure Key Vault:"
-        cat $prepared_data
+        jq . $prepared_data 2>/dev/null || (head -c 1000 $prepared_data && echo "...")
         echo ""
         
         http_code=$(curl -X POST -s -w "%{http_code}" \
@@ -80,7 +80,7 @@ ccf-sign() {
         if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
             echo "ERROR: Azure Key Vault returned HTTP $http_code" >&2
             echo "Response body:" >&2
-            cat $signature >&2
+            jq . $signature 2>/dev/null || (head -c 1000 $signature && echo "...")
             echo "" >&2
             rm -f $prepared_data $signature
             exit 1
@@ -96,22 +96,22 @@ ccf-sign() {
         # Verify it's valid JSON
         if ! jq empty $signature 2>/dev/null; then
             echo "ERROR: Signature response is not valid JSON" >&2
-            echo "Response content:" >&2
-            cat $signature >&2
+            echo "Response content (first 500 chars):" >&2
+            head -c 500 $signature
             echo "" >&2
             rm -f $prepared_data $signature
             exit 1
         fi
         
         echo "Signature retrieved from Azure Key Vault:"
-        cat $signature | jq .
+        jq . $signature
         echo ""
         
         # Verify the signature has the expected format
         if ! jq -e '.kid and .value' $signature >/dev/null 2>&1; then
             echo "ERROR: Signature response missing 'kid' or 'value' fields" >&2
             echo "Response content:" >&2
-            cat $signature | jq . >&2
+            jq . $signature >&2
             echo "" >&2
             rm -f $prepared_data $signature
             exit 1
@@ -134,14 +134,32 @@ ccf-sign() {
             exit 1
         fi
         
-        echo "COSE Sign1 document size: $(wc -c < $cose_output) bytes"
-        echo "First 100 bytes (hex):"
-        head -c 100 $cose_output | xxd -p | head -c 200
-        echo ""
+        cose_size=$(wc -c < $cose_output)
+        echo "COSE Sign1 document size: $cose_size bytes"
+        
+        # Show first bytes in hex (portable method)
+        if command -v od >/dev/null 2>&1; then
+            echo "First 64 bytes (hex):"
+            head -c 64 $cose_output | od -An -tx1 | head -n 4
+        elif command -v hexdump >/dev/null 2>&1; then
+            echo "First 64 bytes (hex):"
+            head -c 64 $cose_output | hexdump -C | head -n 4
+        else
+            echo "First 64 bytes (base64):"
+            head -c 64 $cose_output | base64 -w 0
+            echo ""
+        fi
         echo ""
         
-        # Output the COSE Sign1 document
-        cat $cose_output
+        # Output the COSE Sign1 document (binary data to stdout)
+        # Use dd or head to avoid cat issues in GitHub Actions
+        if [[ $cose_size -gt 0 ]]; then
+            dd if=$cose_output bs=4096 2>/dev/null || head -c $cose_size $cose_output
+        else
+            echo "ERROR: COSE output is empty" >&2
+            rm -f $prepared_data $signature $cose_output
+            exit 1
+        fi
         
         rm -rf $prepared_data $signature $cose_output
     fi
