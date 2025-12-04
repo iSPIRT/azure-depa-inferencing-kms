@@ -68,8 +68,7 @@ jobs:
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
           curl ${KMS_URL}/app/ledgerUsers?api-version=2024-08-22-preview \
             --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer ${BEARER_TOKEN}"
-            | jq .
+            -H "Authorization: Bearer ${BEARER_TOKEN}" | jq .
             
       - name: Get policies
         env:
