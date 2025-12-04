@@ -105,31 +105,6 @@ jobs:
               assignedRoles: ["Administrator"]
             }')" | jq .
 
-      - name: Register ledger backup managed identity as AAD-based Administrator
-        env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_URL: ${{ env.KMS_URL }}
-          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
-          AAD_BACKUP_CLIENT_ID: ${{ secrets.AZURE_LEDGER_BACKUP_CLIENT_ID }}
-        run: |
-          # Get Azure object ID from the backup managed identity client ID
-          AAD_BACKUP_OBJECT_ID=$(az ad sp show --id $AAD_BACKUP_CLIENT_ID --query id --output tsv)
-          echo "AAD Backup Object ID: $AAD_BACKUP_OBJECT_ID"
-          
-          # Get access token for Confidential Ledger
-          BEARER_TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com --query accessToken --output tsv)
-          
-          # Register the backup managed identity with Administrator role using ledgerUsers API
-          curl ${KMS_URL}/app/ledgerUsers/${AAD_BACKUP_OBJECT_ID}?api-version=2024-08-22-preview \
-            --cacert ${KMS_SERVICE_CERT_PATH} \
-            -X PATCH \
-            -H "Content-Type: application/merge-patch+json" \
-            -H "Authorization: Bearer ${BEARER_TOKEN}" \
-            -d "$(jq -n --arg object_id "$AAD_BACKUP_OBJECT_ID" '{
-              user_id: $object_id,
-              assignedRoles: ["Administrator"]
-            }')" | jq .
-
       - name: Register member certificate with Administrator role
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
