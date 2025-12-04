@@ -58,7 +58,6 @@ jobs:
       - name: List ledger users
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_SERVICE_CERT_PATH: ${GITHUB_WORKSPACE}/service_cert.pem
         run: |
           # Get access token for Confidential Ledger
           BEARER_TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com --query accessToken --output tsv)
@@ -66,6 +65,7 @@ jobs:
           # List all users in the ledger
           echo "Listing all users in the ledger:"
           export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
+          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
           curl ${KMS_URL}/app/ledgerUsers?api-version=2024-08-22-preview \
             --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Authorization: Bearer ${BEARER_TOKEN}"
