@@ -10,6 +10,8 @@
 #    given the payload and signing cert, then uses AKV to sign the JSON output, and
 #    then finally calling finish to output the final COSE Sign1 document.
 
+set -eEo pipefail
+
 ccf-sign() {
 
     set -x 
