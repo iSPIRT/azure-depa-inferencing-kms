@@ -19,7 +19,7 @@ on:
 jobs:
   deploy:
     name: ${{ inputs.deployment_name }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     continue-on-error: false
     steps:
       - name: Checkout
