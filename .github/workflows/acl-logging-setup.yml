@@ -91,6 +91,29 @@ jobs:
             }
           '
 
+      - name: Connect PowerShell to Azure
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          pwsh -Command '
+            $ErrorActionPreference = "Stop"
+            
+            # Import Az.Accounts module
+            Import-Module Az.Accounts -Force
+            
+            # Connect using managed identity (works with self-hosted runners that have managed identity)
+            Write-Host "Connecting to Azure using managed identity..."
+            Connect-AzAccount -Identity -AccountId $env:AZURE_CLIENT_ID -ErrorAction Stop
+            
+            # Set the subscription context
+            Set-AzContext -SubscriptionId $env:AZURE_SUBSCRIPTION_ID -ErrorAction Stop
+            
+            Write-Host "✅ Successfully connected to Azure"
+            Get-AzContext | Format-List
+          '
+
       - name: Setup Logging Configuration
         env:
           SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
