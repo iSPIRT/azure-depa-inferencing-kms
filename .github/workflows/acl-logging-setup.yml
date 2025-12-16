@@ -44,7 +44,29 @@ jobs:
 
       - name: Install Az PowerShell Module
         run: |
-          pwsh -Command "Install-Module -Name Az -Scope CurrentUser -Force -AllowClobber"
+          pwsh -Command '
+            $ErrorActionPreference = "Continue"
+            
+            # Ensure PSGallery is registered and trusted
+            if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+              Register-PSRepository -Default -InstallationPolicy Trusted
+            } else {
+              Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+            }
+            
+            # Install/Update PowerShellGet first
+            Install-Module -Name PowerShellGet -Repository PSGallery -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
+            
+            # Import the updated PowerShellGet
+            Import-Module PowerShellGet -Force
+            
+            # Install Az module with explicit repository
+            Install-Module -Name Az -Repository PSGallery -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
+            
+            # Verify installation
+            Write-Host "Installed Az module version:"
+            Get-Module -ListAvailable -Name Az | Select-Object -First 1 | Format-List Name, Version
+          '
 
       - name: Setup Logging Configuration
         env:
@@ -53,52 +75,52 @@ jobs:
           LEDGER_NAME: ${{ inputs.ledger_name }}
           LOG_ANALYTICS_WORKSPACE_NAME: ${{ secrets.AZURE_LOG_ANALYTICS_WORKSPACE_NAME }}
         run: |
-          pwsh -Command "
+          pwsh -Command '
             # Set error action preference
-            `$ErrorActionPreference = 'Stop'
+            $ErrorActionPreference = "Stop"
             
             # Construct ledger resource ID
-            `$ledger = \"/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ConfidentialLedger/Ledgers/$LEDGER_NAME\"
+            $ledger = "/subscriptions/$env:SUBSCRIPTION_ID/resourceGroups/$env:RESOURCE_GROUP/providers/Microsoft.ConfidentialLedger/Ledgers/$env:LEDGER_NAME"
             
-            Write-Host \"🔍 Retrieving diagnostic setting categories for ledger: `$ledger\"
+            Write-Host "🔍 Retrieving diagnostic setting categories for ledger: $ledger"
             
             # Retrieve the category of logs available
-            `$categories = Get-AzDiagnosticSettingCategory -ResourceId `$ledger
-            Write-Host \"Available categories:\"
-            `$categories | Format-Table -AutoSize
+            $categories = Get-AzDiagnosticSettingCategory -ResourceId $ledger
+            Write-Host "Available categories:"
+            $categories | Format-Table -AutoSize
             
             # Set up transaction logs
-            Write-Host \"📝 Setting up transaction logs...\"
-            `$logtxn = New-AzDiagnosticSettingLogSettingsObject -Enabled `$true -Category transactionlogs
+            Write-Host "📝 Setting up transaction logs..."
+            $logtxn = New-AzDiagnosticSettingLogSettingsObject -Enabled $true -Category transactionlogs
             
             # Set up user-defined logs
-            Write-Host \"📝 Setting up user-defined logs...\"
-            `$logudf = New-AzDiagnosticSettingLogSettingsObject -Enabled `$true -Category userdefinedlogs
+            Write-Host "📝 Setting up user-defined logs..."
+            $logudf = New-AzDiagnosticSettingLogSettingsObject -Enabled $true -Category userdefinedlogs
             
             # Set up logs directly with Log Analytics (if provided)
-            if ('$LOG_ANALYTICS_WORKSPACE_NAME' -ne '') {
-              Write-Host \"📊 Configuring logs with Log Analytics Workspace: $LOG_ANALYTICS_WORKSPACE_NAME\"
-              `$workspaceId = \"/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.operationalinsights/workspaces/$LOG_ANALYTICS_WORKSPACE_NAME\"
+            if ($env:LOG_ANALYTICS_WORKSPACE_NAME -ne "") {
+              Write-Host "📊 Configuring logs with Log Analytics Workspace: $env:LOG_ANALYTICS_WORKSPACE_NAME"
+              $workspaceId = "/subscriptions/$env:SUBSCRIPTION_ID/resourceGroups/$env:RESOURCE_GROUP/providers/Microsoft.operationalinsights/workspaces/$env:LOG_ANALYTICS_WORKSPACE_NAME"
               
               try {
-                New-AzDiagnosticSetting -ResourceId `$ledger -Name TXN_LOGS_LA -WorkspaceId `$workspaceId -Log `$logtxn -ErrorAction Stop
-                Write-Host \"✅ Successfully configured transaction logs with Log Analytics Workspace\"
+                New-AzDiagnosticSetting -ResourceId $ledger -Name TXN_LOGS_LA -WorkspaceId $workspaceId -Log $logtxn -ErrorAction Stop
+                Write-Host "✅ Successfully configured transaction logs with Log Analytics Workspace"
               } catch {
-                Write-Host \"⚠️  Warning: Failed to configure Log Analytics logging: `$_\" -ForegroundColor Yellow
+                Write-Host "⚠️  Warning: Failed to configure Log Analytics logging: $_" -ForegroundColor Yellow
               }
             } else {
-              Write-Host \"⏭️  Skipping Log Analytics configuration (not provided)\"
+              Write-Host "⏭️  Skipping Log Analytics configuration (not provided)"
             }
             
             # Check existing configurations
-            Write-Host \"🔍 Checking existing diagnostic settings...\"
-            `$existingSettings = Get-AzDiagnosticSetting -ResourceId `$ledger
-            if (`$existingSettings) {
-              Write-Host \"Current diagnostic settings:\"
-              `$existingSettings | Format-List
+            Write-Host "🔍 Checking existing diagnostic settings..."
+            $existingSettings = Get-AzDiagnosticSetting -ResourceId $ledger
+            if ($existingSettings) {
+              Write-Host "Current diagnostic settings:"
+              $existingSettings | Format-List
             } else {
-              Write-Host \"No diagnostic settings found.\"
+              Write-Host "No diagnostic settings found."
             }
             
-            Write-Host \"✅ Logging configuration completed!\"
-          "
+            Write-Host "✅ Logging configuration completed!"
+          '
