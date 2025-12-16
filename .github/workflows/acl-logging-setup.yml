@@ -34,13 +34,24 @@ jobs:
 
       - name: Install PowerShell
         run: |
-          # Install PowerShell
-          curl -L -o /tmp/powershell.tar.gz https://github.com/PowerShell/PowerShell/releases/download/v7.4.2/powershell-7.4.2-linux-x64.tar.gz
-          sudo mkdir -p /opt/microsoft/powershell/7
-          sudo tar zxf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7
-          sudo chmod +x /opt/microsoft/powershell/7/pwsh
-          sudo ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
-          pwsh --version
+          # Check if PowerShell is already installed
+          if command -v pwsh &> /dev/null; then
+            echo "PowerShell is already installed:"
+            pwsh --version
+          else
+            echo "Installing PowerShell..."
+            curl -L -o /tmp/powershell.tar.gz https://github.com/PowerShell/PowerShell/releases/download/v7.4.2/powershell-7.4.2-linux-x64.tar.gz
+            sudo mkdir -p /opt/microsoft/powershell/7
+            sudo tar zxf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7
+            sudo chmod +x /opt/microsoft/powershell/7/pwsh
+            
+            # Create symlink, removing existing one if it exists
+            if [ -L /usr/bin/pwsh ] || [ -f /usr/bin/pwsh ]; then
+              sudo rm /usr/bin/pwsh
+            fi
+            sudo ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
+            pwsh --version
+          fi
 
       - name: Install Az PowerShell Module
         run: |
