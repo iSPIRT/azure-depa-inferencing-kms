@@ -62,6 +62,21 @@ jobs:
 
       - name: Install Az PowerShell Module
         run: |
+          # Check if modules are already installed
+          pwsh -Command '
+            $azModule = Get-Module -ListAvailable -Name Az | Select-Object -First 1
+            $monitorModule = Get-Module -ListAvailable -Name Az.Monitor | Select-Object -First 1
+            
+            if ($azModule -and $monitorModule) {
+              Write-Host "Az PowerShell modules are already installed:"
+              Write-Host "✅ Az module: $($azModule.Version) at $($azModule.ModuleBase)"
+              Write-Host "✅ Az.Monitor module: $($monitorModule.Version) at $($monitorModule.ModuleBase)"
+              exit 0
+            }
+            
+            Write-Host "Some modules are missing, installing..."
+          '
+          
           # Create directories for AllUsers modules
           sudo mkdir -p /usr/local/share/powershell/Modules
           sudo chmod 755 /usr/local/share/powershell/Modules
@@ -73,11 +88,23 @@ jobs:
             # Register PSGallery for this session
             $null = Register-PSRepository -Default -InstallationPolicy Trusted -ErrorAction SilentlyContinue
             
-            Write-Host "Installing Az module..."
-            Install-Module -Name Az -Scope AllUsers -Force -AllowClobber -SkipPublisherCheck -ErrorAction Continue
+            # Check and install Az module if needed
+            $azModule = Get-Module -ListAvailable -Name Az | Select-Object -First 1
+            if (-not $azModule) {
+              Write-Host "Installing Az module..."
+              Install-Module -Name Az -Scope AllUsers -Force -AllowClobber -SkipPublisherCheck -ErrorAction Continue
+            } else {
+              Write-Host "Az module already installed: $($azModule.Version)"
+            }
             
-            Write-Host "Installing Az.Monitor module..."
-            Install-Module -Name Az.Monitor -Scope AllUsers -Force -AllowClobber -SkipPublisherCheck -ErrorAction Continue
+            # Check and install Az.Monitor module if needed
+            $monitorModule = Get-Module -ListAvailable -Name Az.Monitor | Select-Object -First 1
+            if (-not $monitorModule) {
+              Write-Host "Installing Az.Monitor module..."
+              Install-Module -Name Az.Monitor -Scope AllUsers -Force -AllowClobber -SkipPublisherCheck -ErrorAction Continue
+            } else {
+              Write-Host "Az.Monitor module already installed: $($monitorModule.Version)"
+            }
           '
           
           # Verify installation
