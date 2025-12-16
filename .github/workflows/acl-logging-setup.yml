@@ -74,9 +74,14 @@ jobs:
             # Install Az module with explicit repository
             Install-Module -Name Az -Repository PSGallery -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
             
+            # Install Az.Monitor module (required for diagnostic settings)
+            Install-Module -Name Az.Monitor -Repository PSGallery -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
+            
             # Verify installation
             Write-Host "Installed Az module version:"
             Get-Module -ListAvailable -Name Az | Select-Object -First 1 | Format-List Name, Version
+            Write-Host "Installed Az.Monitor module version:"
+            Get-Module -ListAvailable -Name Az.Monitor | Select-Object -First 1 | Format-List Name, Version
           '
 
       - name: Setup Logging Configuration
@@ -89,6 +94,9 @@ jobs:
           pwsh -Command '
             # Set error action preference
             $ErrorActionPreference = "Stop"
+            
+            # Import Az.Monitor module
+            Import-Module Az.Monitor -Force
             
             # Construct ledger resource ID
             $ledger = "/subscriptions/$env:SUBSCRIPTION_ID/resourceGroups/$env:RESOURCE_GROUP/providers/Microsoft.ConfidentialLedger/Ledgers/$env:LEDGER_NAME"
