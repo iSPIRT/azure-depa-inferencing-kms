@@ -97,15 +97,19 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
+          # Get access token from Azure CLI (which is already authenticated via azure/login action)
+          ACCESS_TOKEN=$(az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv)
+          TENANT_ID=$(az account show --query tenantId -o tsv)
+          
           pwsh -Command '
             $ErrorActionPreference = "Stop"
             
             # Import Az.Accounts module
             Import-Module Az.Accounts -Force
             
-            # Connect using managed identity (works with self-hosted runners that have managed identity)
-            Write-Host "Connecting to Azure using managed identity..."
-            Connect-AzAccount -Identity -AccountId $env:AZURE_CLIENT_ID -ErrorAction Stop
+            # Connect using access token from Azure CLI
+            Write-Host "Connecting to Azure using access token from Azure CLI..."
+            Connect-AzAccount -AccessToken $env:ACCESS_TOKEN -AccountId $env:AZURE_CLIENT_ID -TenantId $env:TENANT_ID -ErrorAction Stop
             
             # Set the subscription context
             Set-AzContext -SubscriptionId $env:AZURE_SUBSCRIPTION_ID -ErrorAction Stop
