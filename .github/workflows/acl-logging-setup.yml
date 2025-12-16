@@ -23,7 +23,14 @@ jobs:
 
       - name: Install Azure CLI
         run: |
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          # Check if Azure CLI is already installed
+          if command -v az &> /dev/null; then
+            echo "Azure CLI is already installed:"
+            az --version
+          else
+            echo "Installing Azure CLI..."
+            curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          fi
 
       - name: Log into Azure
         uses: azure/login@v2
