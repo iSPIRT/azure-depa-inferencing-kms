@@ -98,8 +98,14 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           # Get access token from Azure CLI (which is already authenticated via azure/login action)
-          ACCESS_TOKEN=$(az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv)
-          TENANT_ID=$(az account show --query tenantId -o tsv)
+          export ACCESS_TOKEN=$(az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv)
+          export TENANT_ID=$(az account show --query tenantId -o tsv)
+          
+          # Verify token was retrieved
+          if [ -z "$ACCESS_TOKEN" ]; then
+            echo "Error: Failed to retrieve access token"
+            exit 1
+          fi
           
           pwsh -Command '
             $ErrorActionPreference = "Stop"
@@ -109,6 +115,10 @@ jobs:
             
             # Connect using access token from Azure CLI
             Write-Host "Connecting to Azure using access token from Azure CLI..."
+            if ([string]::IsNullOrEmpty($env:ACCESS_TOKEN)) {
+              Write-Error "ACCESS_TOKEN environment variable is empty"
+              exit 1
+            }
             Connect-AzAccount -AccessToken $env:ACCESS_TOKEN -AccountId $env:AZURE_CLIENT_ID -TenantId $env:TENANT_ID -ErrorAction Stop
             
             # Set the subscription context
