@@ -55,30 +55,37 @@ jobs:
 
       - name: Install Az PowerShell Module
         run: |
-          pwsh -Command '
+          # Create directories for AllUsers modules
+          sudo mkdir -p /usr/local/share/powershell/Modules
+          sudo chmod 755 /usr/local/share/powershell/Modules
+          
+          # Install modules using AllUsers scope (avoids PowerShellGet user config issues)
+          sudo pwsh -Command '
             $ErrorActionPreference = "Continue"
             
-            # Install modules directly without worrying about repository registration
-            # PowerShellGet will use the default PSGallery even if registration shows errors
+            # Register PSGallery for this session
+            $null = Register-PSRepository -Default -InstallationPolicy Trusted -ErrorAction SilentlyContinue
+            
             Write-Host "Installing Az module..."
-            Install-Module -Name Az -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck -ErrorAction Continue
+            Install-Module -Name Az -Scope AllUsers -Force -AllowClobber -SkipPublisherCheck -ErrorAction Continue
             
             Write-Host "Installing Az.Monitor module..."
-            Install-Module -Name Az.Monitor -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck -ErrorAction Continue
-            
-            # Verify installation
-            Write-Host ""
+            Install-Module -Name Az.Monitor -Scope AllUsers -Force -AllowClobber -SkipPublisherCheck -ErrorAction Continue
+          '
+          
+          # Verify installation
+          pwsh -Command '
             Write-Host "Verifying installations..."
             $azModule = Get-Module -ListAvailable -Name Az | Select-Object -First 1
             if ($azModule) {
-              Write-Host "✅ Az module installed: $($azModule.Version)"
+              Write-Host "✅ Az module found: $($azModule.Version) at $($azModule.ModuleBase)"
             } else {
               Write-Host "⚠️  Az module not found"
             }
             
             $monitorModule = Get-Module -ListAvailable -Name Az.Monitor | Select-Object -First 1
             if ($monitorModule) {
-              Write-Host "✅ Az.Monitor module installed: $($monitorModule.Version)"
+              Write-Host "✅ Az.Monitor module found: $($monitorModule.Version) at $($monitorModule.ModuleBase)"
             } else {
               Write-Host "⚠️  Az.Monitor module not found"
             }
