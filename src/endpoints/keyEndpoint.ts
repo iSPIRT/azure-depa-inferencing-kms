@@ -327,7 +327,7 @@ export const unwrapKey = (
       {
         errorMessage: `${name}:wrapping key hash ${validateAttestationResult.body!["x-ms-sevsnpvm-reportdata"]} does not match wrappingKey`,
       },
-      400,
+      401,
       logContext
     );
   }
