@@ -58,8 +58,23 @@ const requestHasWrappingKey = (
   let wrappingKeyHash: string;
   if (wrappingKey) {
     Logger.debug(`requestHasWrappingKey=> wrappingKey: '${wrappingKey}'`);
+    const keyStr = String(wrappingKey);
+    const hasBegin = keyStr.includes("-----BEGIN PUBLIC KEY-----");
+    const hasEnd = keyStr.includes("-----END PUBLIC KEY-----");
+    const hasLiteralNewline = keyStr.includes("\\n");
+    const hasActualNewline = keyStr.includes("\n");
+    const keyLength = keyStr.length;
+    const first50 = keyStr.substring(0, 50);
+    const last50 = keyStr.substring(Math.max(0, keyLength - 50));
+    
     if (!isPemPublicKey(wrappingKey)) {
       Logger.error(`Key-> Not a pem key`);
+      const diagnosticHeaders = {
+        "x-ms-kms-error-code": "INVALID_PEM_FORMAT",
+        "x-ms-kms-error-details": `has_begin:${hasBegin},has_end:${hasEnd},has_literal_nl:${hasLiteralNewline},has_actual_nl:${hasActualNewline},length:${keyLength}`,
+        "x-ms-kms-key-preview-start": first50,
+        "x-ms-kms-key-preview-end": last50
+      };
       return ServiceResult.Failed<{
         wrappingKey: ArrayBuffer;
         wrappingKeyHash: string;
@@ -68,7 +83,8 @@ const requestHasWrappingKey = (
           errorMessage: `${wrappingKey} not a PEM public key`,
         },
         403,
-        logContext
+        logContext,
+        diagnosticHeaders
       );
     }
     wrappingKeyBuf = ccf.strToBuf(wrappingKey);
