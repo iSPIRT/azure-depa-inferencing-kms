@@ -177,7 +177,8 @@ export const key = (
     );
   }
 
-  const receipt = hpkeKeysMap.receipt(kid);
+  //const receipt = hpkeKeysMap.receipt(kid);
+  const receipt = undefined;
 
   if (validateAttestationResult.statusCode === 202) {
     return ServiceResult.Accepted(logContext);
@@ -352,7 +353,8 @@ export const unwrapKey = (
     );
   }
 
-  const receipt = hpkeKeysMap.receipt(wrappedKid);
+  //const receipt = hpkeKeysMap.receipt(wrappedKid);
+  const receipt = undefined;
 
   // Get receipt if available, otherwise return accepted
   if (receipt !== undefined) {
