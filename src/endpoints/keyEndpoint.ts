@@ -296,11 +296,14 @@ export const unwrapKey = (
     serviceRequest.body as IUnwrapRequest,
   );
   if (wrappingKeyFromRequest.success === false) {
-    // WrappingKey has errors
+    // WrappingKey has errors - preserve headers from requestHasWrappingKey and merge with additional context
     const wrappingKey = serviceRequest.body["wrappingKey"];
+    const existingHeaders = wrappingKeyFromRequest.headers || {};
     const diagnosticHeaders = {
-      "x-ms-kms-error-code": "WRAPPING_KEY_ERROR",
-      "x-ms-kms-error-details": `status_code:${wrappingKeyFromRequest.statusCode}`,
+      ...existingHeaders,
+      // Only add these if they don't already exist from requestHasWrappingKey
+      "x-ms-kms-error-code": existingHeaders["x-ms-kms-error-code"] || "WRAPPING_KEY_ERROR",
+      "x-ms-kms-error-details": existingHeaders["x-ms-kms-error-details"] || `status_code:${wrappingKeyFromRequest.statusCode}`,
       "x-ms-kms-wrapping-key-exists": String(!!wrappingKey),
       "x-ms-kms-wrapping-key-length": wrappingKey ? String(wrappingKey).length : "0",
       "x-ms-kms-wrapping-key-preview": wrappingKey ? String(wrappingKey).substring(0, 50) : "none"
