@@ -178,17 +178,9 @@ export const key = (
   }
 
   //const receipt = hpkeKeysMap.receipt(kid);
-  const receipt = undefined;
+  const receipt = "";
 
   if (validateAttestationResult.statusCode === 202) {
-    return ServiceResult.Accepted(logContext);
-  }
-
-  // Get receipt if available
-  if (receipt !== undefined) {
-    keyItem.receipt = receipt;
-    Logger.debug(`Key->Receipt: ${receipt}`);
-  } else {
     return ServiceResult.Accepted(logContext);
   }
 
@@ -353,16 +345,7 @@ export const unwrapKey = (
     );
   }
 
-  //const receipt = hpkeKeysMap.receipt(wrappedKid);
-  const receipt = undefined;
-
-  // Get receipt if available, otherwise return accepted
-  if (receipt !== undefined) {
-    keyItem.receipt = receipt;
-    Logger.debug(`Key->Receipt: ${receipt}`);
-  } else {
-    return ServiceResult.Accepted(logContext);
-  }
+  const receipt = "";
 
   // Get wrapped key
   try {
