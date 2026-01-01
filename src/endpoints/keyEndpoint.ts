@@ -374,7 +374,7 @@ export const unwrapKey = (
       {
         errorMessage: `${name}:wrapping key hash ${reportData} does not match wrappingKey`,
       },
-      401,
+      400,
       logContext,
       diagnosticHeaders
     );
