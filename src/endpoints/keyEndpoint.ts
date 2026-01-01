@@ -194,14 +194,6 @@ export const key = (
     return ServiceResult.Accepted(logContext);
   }
 
-  // Get receipt if available
-  if (receipt !== undefined) {
-    keyItem.receipt = receipt;
-    Logger.debug(`Key->Receipt: ${receipt}`);
-  } else {
-    return ServiceResult.Accepted(logContext);
-  }
-
   // Get wrapped key
   try {
     let wrapped: string | IWrapped;
