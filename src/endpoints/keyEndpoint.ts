@@ -63,17 +63,12 @@ const requestHasWrappingKey = (
     const hasEnd = keyStr.includes("-----END PUBLIC KEY-----");
     const hasLiteralNewline = keyStr.includes("\\n");
     const hasActualNewline = keyStr.includes("\n");
-    const keyLength = keyStr.length;
-    const first50 = keyStr.substring(0, 50);
-    const last50 = keyStr.substring(Math.max(0, keyLength - 50));
     
     if (!isPemPublicKey(wrappingKey)) {
       Logger.error(`Key-> Not a pem key`);
       const diagnosticHeaders = {
         "x-ms-kms-error-code": "INVALID_PEM_FORMAT",
-        "x-ms-kms-error-details": `has_begin:${hasBegin},has_end:${hasEnd},has_literal_nl:${hasLiteralNewline},has_actual_nl:${hasActualNewline},length:${keyLength}`,
-        "x-ms-kms-key-preview-start": first50,
-        "x-ms-kms-key-preview-end": last50
+        "x-ms-kms-error-details": `has_begin:${hasBegin},has_end:${hasEnd},has_literal_nl:${hasLiteralNewline},has_actual_nl:${hasActualNewline}`
       };
       return ServiceResult.Failed<{
         wrappingKey: ArrayBuffer;
@@ -82,7 +77,7 @@ const requestHasWrappingKey = (
         {
           errorMessage: `${wrappingKey} not a PEM public key`,
         },
-        403,
+        400,
         logContext,
         diagnosticHeaders
       );
@@ -103,7 +98,7 @@ const requestHasWrappingKey = (
     {
       errorMessage: `Missing wrappingKey`,
     },
-    405,
+    400,
     logContext
   );
 };
@@ -305,8 +300,7 @@ export const unwrapKey = (
       "x-ms-kms-error-code": existingHeaders["x-ms-kms-error-code"] || "WRAPPING_KEY_ERROR",
       "x-ms-kms-error-details": existingHeaders["x-ms-kms-error-details"] || `status_code:${wrappingKeyFromRequest.statusCode}`,
       "x-ms-kms-wrapping-key-exists": String(!!wrappingKey),
-      "x-ms-kms-wrapping-key-length": wrappingKey ? String(wrappingKey).length : "0",
-      "x-ms-kms-wrapping-key-preview": wrappingKey ? String(wrappingKey).substring(0, 50) : "none"
+      "x-ms-kms-wrapping-key-length": wrappingKey ? String(wrappingKey).length : "0"
     };
     return ServiceResult.Failed<string>(
       wrappingKeyFromRequest.error!,
