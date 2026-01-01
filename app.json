@@ -110,6 +110,28 @@
         }
       }
     },
+    "/jwtValidationPolicy": {
+      "get": {
+        "js_module": "endpoints/jwtValidationPolicyEndpoint.js",
+        "js_function": "jwtValidationPolicy",
+        "forwarding_required": "sometimes",
+        "redirection_strategy": "none",
+        "authn_policies": [],
+        "mode": "readonly",
+        "openapi": {
+          "responses": {
+            "200": {
+              "description": "JWT validation policy for all issuers",
+              "content": {
+                "application/json": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/pubkey": {
       "get": {
         "js_module": "endpoints/publickeyEndpoint.js",
@@ -264,7 +286,7 @@
         "js_function": "key",
         "forwarding_required": "sometimes",
         "redirection_strategy": "none",
-        "authn_policies": [],
+        "authn_policies": ["jwt"],
         "mode": "readonly",
         "parameters": [
           {
