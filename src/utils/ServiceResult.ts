@@ -72,11 +72,12 @@ export class ServiceResult<T> {
     error: ErrorResponse,
     statusCode: number = 400,
     logContext: LogContext,
+    headers?: { [key: string]: string | number },
   ): ServiceResult<T> {
     Logger.error(`Failed result: ${statusCode},`, logContext, error);
-    const headers = {};
-    if (logContext.requestId) headers[ServiceResult.KMS_REQUEST_ID_HEADER] = logContext.requestId;
+    const responseHeaders = headers ? { ...headers } : {};
+    if (logContext.requestId) responseHeaders[ServiceResult.KMS_REQUEST_ID_HEADER] = logContext.requestId;
     if (logContext) error.errorMessage = `${logContext.toString()} ${error.errorMessage}`;
-    return new ServiceResult<T>(undefined, error, false, statusCode, headers);
+    return new ServiceResult<T>(undefined, error, false, statusCode, responseHeaders);
   }
 }

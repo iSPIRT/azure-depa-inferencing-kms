@@ -58,8 +58,18 @@ const requestHasWrappingKey = (
   let wrappingKeyHash: string;
   if (wrappingKey) {
     Logger.debug(`requestHasWrappingKey=> wrappingKey: '${wrappingKey}'`);
+    const keyStr = String(wrappingKey);
+    const hasBegin = keyStr.includes("-----BEGIN PUBLIC KEY-----");
+    const hasEnd = keyStr.includes("-----END PUBLIC KEY-----");
+    const hasLiteralNewline = keyStr.includes("\\n");
+    const hasActualNewline = keyStr.includes("\n");
+    
     if (!isPemPublicKey(wrappingKey)) {
       Logger.error(`Key-> Not a pem key`);
+      const diagnosticHeaders = {
+        "x-ms-kms-error-code": "INVALID_PEM_FORMAT",
+        "x-ms-kms-error-details": `has_begin:${hasBegin},has_end:${hasEnd},has_literal_nl:${hasLiteralNewline},has_actual_nl:${hasActualNewline}`
+      };
       return ServiceResult.Failed<{
         wrappingKey: ArrayBuffer;
         wrappingKeyHash: string;
@@ -68,7 +78,8 @@ const requestHasWrappingKey = (
           errorMessage: `${wrappingKey} not a PEM public key`,
         },
         400,
-        logContext
+        logContext,
+        diagnosticHeaders
       );
     }
     wrappingKeyBuf = ccf.strToBuf(wrappingKey);
@@ -177,8 +188,7 @@ export const key = (
     );
   }
 
-  //const receipt = hpkeKeysMap.receipt(kid);
-  const receipt = "";
+  const receipt = hpkeKeysMap.receipt(kid) || "";
 
   if (validateAttestationResult.statusCode === 202) {
     return ServiceResult.Accepted(logContext);
@@ -253,12 +263,19 @@ export const unwrapKey = (
   // check payload
   const wrappedKid: string = serviceRequest.body["wrappedKid"];
   if (wrappedKid === undefined) {
+    const diagnosticHeaders = {
+      "x-ms-kms-error-code": "MISSING_WRAPPED_KID",
+      "x-ms-kms-error-details": `body_keys:${Object.keys(serviceRequest.body).join(",")}`,
+      "x-ms-kms-has-wrapping-key": String(!!serviceRequest.body["wrappingKey"]),
+      "x-ms-kms-has-attestation": String(!!serviceRequest.body["attestation"])
+    };
     return ServiceResult.Failed<string>(
       {
         errorMessage: `${name}: Missing  ${name} wrappedKid in request: ${JSON.stringify(serviceRequest.body)}`,
       },
       400,
-      logContext
+      logContext,
+      diagnosticHeaders
     );
   }
 
@@ -266,11 +283,22 @@ export const unwrapKey = (
     serviceRequest.body as IUnwrapRequest,
   );
   if (wrappingKeyFromRequest.success === false) {
-    // WrappingKey has errors
+    // WrappingKey has errors - preserve headers from requestHasWrappingKey and merge with additional context
+    const wrappingKey = serviceRequest.body["wrappingKey"];
+    const existingHeaders = wrappingKeyFromRequest.headers || {};
+    const diagnosticHeaders = {
+      ...existingHeaders,
+      // Only add these if they don't already exist from requestHasWrappingKey
+      "x-ms-kms-error-code": existingHeaders["x-ms-kms-error-code"] || "WRAPPING_KEY_ERROR",
+      "x-ms-kms-error-details": existingHeaders["x-ms-kms-error-details"] || `status_code:${wrappingKeyFromRequest.statusCode}`,
+      "x-ms-kms-wrapping-key-exists": String(!!wrappingKey),
+      "x-ms-kms-wrapping-key-length": wrappingKey ? String(wrappingKey).length : "0"
+    };
     return ServiceResult.Failed<string>(
       wrappingKeyFromRequest.error!,
       wrappingKeyFromRequest.statusCode,
       logContext,
+      diagnosticHeaders
     );
   }
 
@@ -280,12 +308,17 @@ export const unwrapKey = (
 
   const fmt = serviceRequest.query?.["fmt"] || "jwk";
   if (!(fmt === "jwk" || fmt === "tink")) {
+    const diagnosticHeaders = {
+      "x-ms-kms-error-code": "INVALID_FMT_PARAMETER",
+      "x-ms-kms-error-details": `fmt_received:${fmt},fmt_valid:jwk,tink`
+    };
     return ServiceResult.Failed<string>(
       {
         errorMessage: `${name}: Wrong fmt query parameter '${fmt}'. Must be jwt or tink.`,
       },
       400,
-      logContext
+      logContext,
+      diagnosticHeaders
     );
   }
 
@@ -294,34 +327,48 @@ export const unwrapKey = (
   try {
     validateAttestationResult = validateAttestation(attestation);
     if (!validateAttestationResult.success) {
+      const diagnosticHeaders = {
+        "x-ms-kms-error-code": "ATTESTATION_VALIDATION_FAILED",
+        "x-ms-kms-error-details": `status_code:${validateAttestationResult.statusCode}`,
+        "x-ms-kms-attestation-has-evidence": String(!!attestation.evidence),
+        "x-ms-kms-attestation-has-endorsements": String(!!attestation.endorsements)
+      };
       return ServiceResult.Failed<string>(
         validateAttestationResult.error!,
         validateAttestationResult.statusCode,
-        logContext
+        logContext,
+        diagnosticHeaders
       );
     }
   } catch (exception: any) {
+    const diagnosticHeaders = {
+      "x-ms-kms-error-code": "ATTESTATION_VALIDATION_EXCEPTION",
+      "x-ms-kms-error-details": `exception:${exception.message}`
+    };
     return ServiceResult.Failed<string>(
       {
         errorMessage: `${name}: Error in validating attestation (${attestation}): ${exception.message}`,
       },
       500,
-      logContext
+      logContext,
+      diagnosticHeaders
     );
   }
 
   // Check if wrapping key match attestation
-  if (
-    !validateAttestationResult.body!["x-ms-sevsnpvm-reportdata"].startsWith(
-      wrappingKeyHash,
-    )
-  ) {
+  const reportData = validateAttestationResult.body!["x-ms-sevsnpvm-reportdata"];
+  if (!reportData.startsWith(wrappingKeyHash)) {
+    const diagnosticHeaders = {
+      "x-ms-kms-error-code": "WRAPPING_KEY_HASH_MISMATCH",
+      "x-ms-kms-error-details": `expected_prefix:${wrappingKeyHash.substring(0, 16)}...,actual_prefix:${reportData.substring(0, 16)}...`
+    };
     return ServiceResult.Failed<string>(
       {
-        errorMessage: `${name}:wrapping key hash ${validateAttestationResult.body!["x-ms-sevsnpvm-reportdata"]} does not match wrappingKey`,
+        errorMessage: `${name}:wrapping key hash ${reportData} does not match wrappingKey`,
       },
       400,
-      logContext
+      logContext,
+      diagnosticHeaders
     );
   }
 
@@ -329,23 +376,41 @@ export const unwrapKey = (
   Logger.debug(`Get key with kid ${wrappedKid}`);
   const keyItem = hpkeKeysMap.store.get(wrappedKid) as IKeyItem;
   if (keyItem === undefined) {
+    const diagnosticHeaders = {
+      "x-ms-kms-error-code": "KEY_NOT_FOUND",
+      "x-ms-kms-error-details": `wrapped_kid:${wrappedKid}`
+    };
     return ServiceResult.Failed<string>(
       { errorMessage: `${name}:kid ${wrappedKid} not found in store` },
       404,
-      logContext
+      logContext,
+      diagnosticHeaders
     );
   }
 
   const [expired, _depricated] = KeyRotationPolicy.isExpired(keyRotationPolicyMap, keyItem, logContext);
   if (expired) {
+    const diagnosticHeaders = {
+      "x-ms-kms-error-code": "KEY_EXPIRED",
+      "x-ms-kms-error-details": `wrapped_kid:${wrappedKid}`
+    };
     return ServiceResult.Failed<string>(
       { errorMessage: `${name}:kid ${wrappedKid} has expired` },
       410,  // 410 Gone, key no longer available
-      logContext
+      logContext,
+      diagnosticHeaders
     );
   }
 
-  const receipt = "";
+  const receipt = hpkeKeysMap.receipt(wrappedKid) || "";
+
+  // Get receipt if available, otherwise return accepted
+  if (receipt !== undefined) {
+    keyItem.receipt = receipt;
+    Logger.debug(`Key->Receipt: ${receipt}`);
+  } else {
+    return ServiceResult.Accepted(logContext);
+  }
 
   // Get wrapped key
   try {
@@ -364,10 +429,15 @@ export const unwrapKey = (
       return ServiceResult.Succeeded<IUnwrapResponse>(ret, logContext);
     }
   } catch (exception: any) {
+    const diagnosticHeaders = {
+      "x-ms-kms-error-code": "WRAP_KEY_EXCEPTION",
+      "x-ms-kms-error-details": `wrapped_kid:${wrappedKid},fmt:${fmt},exception:${exception.message}`
+    };
     return ServiceResult.Failed<string>(
       { errorMessage: `${name}: Error (${wrappedKid}): ${exception.message}` },
       500,
-      logContext
+      logContext,
+      diagnosticHeaders
     );
   }
 };
