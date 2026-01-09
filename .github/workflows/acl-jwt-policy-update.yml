@@ -11,20 +11,31 @@ on:
         type: string
         description: "Name of the deployment to update JWT policy for"
         default: "depa-inferencing-kms-prod-cin"
+      trust_type:
+        type: choice
+        description: "Type of JWT trust to configure"
+        options:
+          - managed-identity
+          - aad
+        default: "managed-identity"
       managed_identity_resource_id:
         type: string
-        description: "Resource ID of the managed identity (e.g., /subscriptions/.../resourceGroups/.../providers/Microsoft.ManagedIdentity/userAssignedIdentities/...)"
-        required: true
+        description: "Resource ID of the managed identity (e.g., /subscriptions/.../resourceGroups/.../providers/Microsoft.ManagedIdentity/userAssignedIdentities/...). Required when trust_type is 'managed-identity'"
+        required: false
   workflow_call:
     inputs:
       deployment_name:
         type: string
         description: "Name of the deployment to update JWT policy for"
         default: "depa-inferencing-kms-prod-cin"
+      trust_type:
+        type: string
+        description: "Type of JWT trust to configure (managed-identity or aad)"
+        default: "managed-identity"
       managed_identity_resource_id:
         type: string
-        description: "Resource ID of the managed identity"
-        required: true
+        description: "Resource ID of the managed identity. Required when trust_type is 'managed-identity'"
+        required: false
 
 jobs:
   update-jwt-policy:
@@ -112,7 +123,17 @@ jobs:
             --vault-name $AKV_VAULT_NAME \
             --name ${DEPLOYMENT_NAME}-member-cert
 
-      - name: Update JWT validation policy with managed identity
+      - name: Validate inputs
+        env:
+          TRUST_TYPE: ${{ inputs.trust_type || 'managed-identity' }}
+          MANAGED_IDENTITY_RESOURCE_ID: ${{ inputs.managed_identity_resource_id }}
+        run: |
+          if [ "$TRUST_TYPE" = "managed-identity" ] && [ -z "$MANAGED_IDENTITY_RESOURCE_ID" ]; then
+            echo "Error: managed_identity_resource_id is required when trust_type is 'managed-identity'"
+            exit 1
+          fi
+
+      - name: Update JWT validation policy
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
           KMS_URL: ${{ env.KMS_URL }}
@@ -122,10 +143,18 @@ jobs:
           AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
+          TRUST_TYPE: ${{ inputs.trust_type || 'managed-identity' }}
           MANAGED_IDENTITY_RESOURCE_ID: ${{ inputs.managed_identity_resource_id }}
         run: |
-          export JWT_TRUST_TYPE="--managed-identity"
-          export JWT_TRUST_ARGS="${MANAGED_IDENTITY_RESOURCE_ID}"
+          if [ "$TRUST_TYPE" = "aad" ]; then
+            echo "Updating JWT validation policy with AAD (current Azure user)"
+            export JWT_TRUST_TYPE="--aad"
+            export JWT_TRUST_ARGS=""
+          else
+            echo "Updating JWT validation policy with managed identity: $MANAGED_IDENTITY_RESOURCE_ID"
+            export JWT_TRUST_TYPE="--managed-identity"
+            export JWT_TRUST_ARGS="${MANAGED_IDENTITY_RESOURCE_ID}"
+          fi
           make jwt-issuer-trust
 
       - name: Print updated JWT validation policy
