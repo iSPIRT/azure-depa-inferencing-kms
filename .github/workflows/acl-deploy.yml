@@ -97,6 +97,7 @@ jobs:
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
         run: |
+          rm -f ${KMS_MEMBER_CERT_PATH}
           az keyvault certificate download \
             --file ${KMS_MEMBER_CERT_PATH} \
             --vault-name $AKV_VAULT_NAME \
