@@ -48,8 +48,7 @@ jobs:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
         run: |
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
-          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
-            | jq -r '.ledgerTlsCertificate' > $KMS_SERVICE_CERT_PATH
+          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME | jq -r '.ledgerTlsCertificate' > $KMS_SERVICE_CERT_PATH
 
       - name: Update KMS application
         env:
