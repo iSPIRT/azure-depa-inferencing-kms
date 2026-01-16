@@ -97,6 +97,7 @@ jobs:
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
         run: |
+          rm -f ${KMS_MEMBER_CERT_PATH}
           az keyvault certificate download \
             --file ${KMS_MEMBER_CERT_PATH} \
             --vault-name $AKV_VAULT_NAME \
@@ -183,3 +184,16 @@ jobs:
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
         run: |
           make key-rotation-policy-set key-rotation-policy-proposal=./governance/proposals/set_key_rotation_policy.json
+
+      - name: Set baseline JWT validation policy
+        env:
+          KMS_URL: ${{ env.KMS_URL }}
+          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
+          USE_AKV: "true"
+          AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
+          AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
+          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
+          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
+        run: |
+          export JWT_TRUST_TYPE="--aad"
+          make jwt-issuer-trust 

@@ -7,6 +7,7 @@ export * from "./endpoints/publickeyEndpoint";
 export * from "./endpoints/refreshEndpoint";
 export * from "./endpoints/keyReleasePolicyEndpoint";
 export * from "./endpoints/settingsPolicyEndpoint";
+export * from "./endpoints/jwtValidationPolicyEndpoint";
 export * from "./endpoints/IKeyItem";
 export * from "./endpoints/KeyGeneration";
 export * from "./endpoints/TinkKey";
