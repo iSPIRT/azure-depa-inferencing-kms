@@ -12,3 +12,4 @@ aad.env
 *.log
 temp*/
 __pycache__/
+.venv
