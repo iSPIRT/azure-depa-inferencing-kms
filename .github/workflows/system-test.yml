@@ -60,5 +60,5 @@ jobs:
           SUBSCRIPTION: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}      
         run: |
-          pytest -sv \
+          pytest -sv -p no:xdist \
             test/system-test/${{ inputs.test_path }}.py
