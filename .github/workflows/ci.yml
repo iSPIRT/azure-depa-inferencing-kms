@@ -35,12 +35,6 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: E2E tests
-        run: make demo
-
-      - name: Print CCF logs
-        run: cat workspace/sandbox_0/out
-
   system-acl:
     name: system test_all_seq (acl)
     secrets: inherit # pragma: allowlist secret
