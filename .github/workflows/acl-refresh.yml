@@ -26,6 +26,7 @@ jobs:
     name: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
     runs-on: ubuntu-latest
     continue-on-error: false
+    environment: Production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
