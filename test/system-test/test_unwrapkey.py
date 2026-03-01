@@ -25,7 +25,7 @@ def test_unwrap_key_and_decrypt(setup_kms):
     status_code, unwrapped_json = call_endpoint(fr"""
         scripts/kms/endpoints/unwrapKey.sh \
             --attestation "$(cat test/attestation-samples/snp.json)" \
-            --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+            --wrapping-key-file test/data-samples/publicWrapKey.pem \
             --wrappedKid "{key_json["wrappedKid"]}"
     """)
     assert status_code == 200
@@ -51,7 +51,7 @@ def test_unwrap_key_missing_attestation(setup_kms):
     status_code, unwrapped_json = call_endpoint(fr"""
         scripts/kms/endpoints/unwrapKey.sh \
             --attestation "abc" \
-            --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+            --wrapping-key-file test/data-samples/publicWrapKey.pem \
             --wrappedKid "{key_json["wrappedKid"]}"
     """)
     assert status_code == 400
@@ -87,7 +87,7 @@ def test_unwrap_key_missing_wrappedKid(setup_kms):
     status_code, unwrapped_json = call_endpoint(fr"""
         scripts/kms/endpoints/unwrapKey.sh \
             --attestation "$(cat test/attestation-samples/snp.json)" \
-            --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+            --wrapping-key-file test/data-samples/publicWrapKey.pem \
             --wrappedKid ""
     """)
     assert status_code == 404
@@ -100,7 +100,7 @@ def test_unwrap_key_without_refresh(setup_kms):
     status_code, unwrapped_json = call_endpoint(fr"""
         scripts/kms/endpoints/unwrapKey.sh \
             --attestation "$(cat test/attestation-samples/snp.json)" \
-            --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+            --wrapping-key-file test/data-samples/publicWrapKey.pem \
             --wrappedKid "abc"
     """)
     assert status_code == 404

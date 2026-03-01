@@ -17,6 +17,7 @@ jobs:
     name: Setup ACL Logging
     runs-on: self-hosted
     continue-on-error: false
+    environment: Production
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -41,7 +41,7 @@ def test_key_in_grace_period_with_rotation_policy(setup_kms):
     status_code, unwrapped_json = call_endpoint(fr"""
         scripts/kms/endpoints/unwrapKey.sh \
             --attestation "$(cat test/attestation-samples/snp.json)" \
-            --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+            --wrapping-key-file test/data-samples/publicWrapKey.pem \
             --wrappedKid "{key_json["wrappedKid"]}"
     """)
     assert status_code == 200
@@ -68,7 +68,7 @@ def test_key_in_grace_period_without_rotation_policy(setup_kms):
     status_code, unwrapped_json = call_endpoint(fr"""
         scripts/kms/endpoints/unwrapKey.sh \
             --attestation "$(cat test/attestation-samples/snp.json)" \
-            --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+            --wrapping-key-file test/data-samples/publicWrapKey.pem \
             --wrappedKid "{key_json["wrappedKid"]}"
     """)
     assert status_code == 200
@@ -97,7 +97,7 @@ def test_key_in_grace_period_with_custom_rotation_policy(setup_kms):
     status_code, unwrapped_json = call_endpoint(fr"""
         scripts/kms/endpoints/unwrapKey.sh \
             --attestation "$(cat test/attestation-samples/snp.json)" \
-            --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+            --wrapping-key-file test/data-samples/publicWrapKey.pem \
             --wrappedKid "{key_json["wrappedKid"]}"
     """)
     assert status_code == 200
@@ -122,7 +122,7 @@ def test_key_in_grace_period_with_custom_rotation_policy(setup_kms):
     status_code, unwrapped_json = call_endpoint(fr"""
         scripts/kms/endpoints/unwrapKey.sh \
             --attestation "$(cat test/attestation-samples/snp.json)" \
-            --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+            --wrapping-key-file test/data-samples/publicWrapKey.pem \
             --wrappedKid "{key_json["wrappedKid"]}"
     """)
     assert status_code == 200
@@ -132,7 +132,7 @@ def test_key_in_grace_period_with_custom_rotation_policy(setup_kms):
     status_code, unwrapped_json = call_endpoint(fr"""
         scripts/kms/endpoints/unwrapKey.sh \
             --attestation "$(cat test/attestation-samples/snp.json)" \
-            --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+            --wrapping-key-file test/data-samples/publicWrapKey.pem \
             --wrappedKid "{key_json["wrappedKid"]}"
     """)
     assert status_code == 410  # check for expired key
