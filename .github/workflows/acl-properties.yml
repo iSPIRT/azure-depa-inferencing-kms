@@ -7,22 +7,42 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        type: choice
+        description: "Target environment (UAT or Production)"
+        options:
+          - UAT
+          - Production
+        default: Production
       deployment_name:
         type: string
         description: "Name of the deployment"
         default: "depa-inferencing-kms-prod-cin"
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
   workflow_call:
     inputs:
+      environment:
+        type: string
+        description: "Target environment (UAT or Production)"
+        default: Production
       deployment_name:
         type: string
         description: "Name of the deployment"
         default: "depa-inferencing-kms-prod-cin"
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
 
 jobs:
   deploy:
     name: ${{ inputs.deployment_name }}
     runs-on: ubuntu-latest
     continue-on-error: false
+    environment: ${{ inputs.environment }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,13 +78,13 @@ jobs:
       - name: List ledger users
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
+          KMS_URL: ${{ inputs.kms_url }}
         run: |
           # Get access token for Confidential Ledger
           BEARER_TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com --query accessToken --output tsv)
           
           # List all users in the ledger
           echo "Listing all users in the ledger:"
-          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
           curl ${KMS_URL}/app/ledgerUsers?api-version=2024-08-22-preview \
             --cacert ${KMS_SERVICE_CERT_PATH} \
@@ -73,9 +93,9 @@ jobs:
       - name: Get policies
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+          KMS_URL: ${{ inputs.kms_url }}
         run: |
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
-          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
           export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
           curl ${KMS_URL}/app/keyReleasePolicy --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
@@ -85,8 +105,8 @@ jobs:
       - name: Get public keys
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+          KMS_URL: ${{ inputs.kms_url }}
         run: |
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
-          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
           curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Content-Type: application/json" -w '\n' | jq

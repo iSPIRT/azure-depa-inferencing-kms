@@ -7,22 +7,42 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        type: choice
+        description: "Target environment (UAT or Production)"
+        options:
+          - UAT
+          - Production
+        default: Production
       deployment_name:
         type: string
         description: "Name of the deployment"
         default: "depa-inferencing-kms-prod-cin"
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
   workflow_call:
     inputs:
+      environment:
+        type: string
+        description: "Target environment (UAT or Production)"
+        default: Production
       deployment_name:
         type: string
         description: "Name of the deployment"
         default: "depa-inferencing-kms-prod-cin"
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
 
 jobs:
   deploy:
     name: ${{ inputs.deployment_name }}
     runs-on: ubuntu-latest
     continue-on-error: false
+    environment: ${{ inputs.environment }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -54,7 +74,7 @@ jobs:
       - name: Update KMS application
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+          KMS_URL: ${{ inputs.kms_url }}
         run: |
-          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
           make js-app-set

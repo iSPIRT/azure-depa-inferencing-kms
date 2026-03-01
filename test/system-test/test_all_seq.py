@@ -207,7 +207,7 @@ def test_set_policy_single_key_no_jwt_unwrapKey(setup_kms_session):
         status_code, unwrapped_json = call_endpoint(fr"""
             scripts/kms/endpoints/unwrapKey.sh \
                 --attestation "$(cat test/attestation-samples/snp.json)" \
-                --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+                --wrapping-key-file test/data-samples/publicWrapKey.pem \
                 --wrappedKid "{key_json["wrappedKid"]}"
         """)
         if status_code != 202:
@@ -464,7 +464,7 @@ def test_set_policy_multiple_keys_set_jwt_unwrapKey_no_kid(setup_kms_session):
         status_code, unwrapped_json = call_endpoint(fr"""
             scripts/kms/endpoints/unwrapKey.sh \
                 --attestation "$(cat test/attestation-samples/snp.json)" \
-                --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+                --wrapping-key-file test/data-samples/publicWrapKey.pem \
                 --wrappedKid "{key_json["wrappedKid"]}"
         """)
         if status_code != 202:
@@ -492,7 +492,7 @@ def test_set_policy_multiple_keys_set_jwt_unwrapKey_first_kid(setup_kms_session)
         status_code, unwrapped_json = call_endpoint(fr"""
             scripts/kms/endpoints/unwrapKey.sh \
                 --attestation "$(cat test/attestation-samples/snp.json)" \
-                --wrapping-key "$(sed ':a;N;$!ba;s/\n/\\n/g' test/data-samples/publicWrapKey.pem)" \
+                --wrapping-key-file test/data-samples/publicWrapKey.pem \
                 --wrappedKid "{key_json["wrappedKid"]}"
         """)
         if status_code != 202:
