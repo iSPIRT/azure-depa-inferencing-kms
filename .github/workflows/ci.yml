@@ -51,4 +51,5 @@ jobs:
     uses: ./.github/workflows/system-tests.yml
     with:
       env: acl
+      parallel: false
       use_akv: ${{ matrix.use_akv }}
