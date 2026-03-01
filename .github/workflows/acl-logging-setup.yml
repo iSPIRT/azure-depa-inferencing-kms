@@ -7,6 +7,13 @@ permissions:
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        type: choice
+        description: "Target environment (UAT or Production)"
+        options:
+          - UAT
+          - Production
+        default: Production
       ledger_name:
         type: string
         description: "Confidential Ledger name"
@@ -17,7 +24,7 @@ jobs:
     name: Setup ACL Logging
     runs-on: self-hosted
     continue-on-error: false
-    environment: Production
+    environment: ${{ inputs.environment }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
