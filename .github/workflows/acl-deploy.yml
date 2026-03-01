@@ -10,17 +10,26 @@ on:
       deployment_name:
         type: string
         description: "Name of the deployment to use for ACL tests"
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
   workflow_call:
     inputs:
       deployment_name:
         type: string
         description: "Name of the deployment to use for ACL tests"
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
 
 jobs:
   deploy:
     name: ${{ inputs.deployment_name }}
     runs-on: self-hosted
     continue-on-error: false
+    environment: Production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -71,12 +80,11 @@ jobs:
       - name: Setup environment variables
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms' }}
+          KMS_URL: ${{ inputs.kms_url }}
         run: |
           export KMS_WORKSPACE=~/$DEPLOYMENT_NAME.aclworkspace
           mkdir -p $KMS_WORKSPACE/proposals
           echo "KMS_WORKSPACE=$KMS_WORKSPACE" >> $GITHUB_ENV
-          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
-          echo "KMS_URL=$KMS_URL" >> $GITHUB_ENV
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
           echo "KMS_SERVICE_CERT_PATH=$KMS_SERVICE_CERT_PATH" >> $GITHUB_ENV
           export KMS_MEMBER_CERT_PATH=${KMS_WORKSPACE}/member_cert.pem
@@ -105,7 +113,7 @@ jobs:
       - name: Register managed identity as AAD-based Administrator
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_URL: ${{ env.KMS_URL }}
+          KMS_URL: ${{ inputs.kms_url }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
           AAD_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
         run: |
@@ -130,7 +138,7 @@ jobs:
       - name: Register member certificate with Administrator role
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_URL: ${{ env.KMS_URL }}
+          KMS_URL: ${{ inputs.kms_url }}
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
           KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
         run: |

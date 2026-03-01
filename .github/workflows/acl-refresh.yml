@@ -14,12 +14,20 @@ on:
         type: string
         description: "Name of the deployment"
         default: "depa-inferencing-kms-prod-cin"
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
   workflow_call:
     inputs:
       deployment_name:
         type: string
         description: "Name of the deployment"
         default: "depa-inferencing-kms-prod-cin"
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
 
 jobs:
   deploy:
@@ -57,10 +65,9 @@ jobs:
       - name: Call refresh
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
+          KMS_URL: ${{ inputs.kms_url }}
         run: |
-
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
-          export KMS_URL=https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com
 
           # List public keys for refresh
           curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \

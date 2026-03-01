@@ -11,13 +11,20 @@ on:
         type: string
         description: "Name of the deployment"
         default: "depa-inferencing-kms-prod-cin"
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
   workflow_call:
     inputs:
       deployment_name:
         type: string
         description: "Name of the deployment"
         default: "depa-inferencing-kms-prod-cin"
-
+      kms_url:
+        type: string
+        description: "KMS URL"
+        default: "https://depa-inferencing-kms-azure.ispirt.in"
 jobs:
   deploy:
     name: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
