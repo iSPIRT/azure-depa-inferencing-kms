@@ -41,15 +41,11 @@ jobs:
       - name: Print CCF logs
         run: cat workspace/sandbox_0/out
 
-  system-ccf-acl:
-    name: system / ccf-acl (${{ matrix.use_akv && 'akv' || 'local' }}_keys)
+  system-acl:
+    name: system test_all_seq (acl)
     secrets: inherit # pragma: allowlist secret
-    strategy:
-      fail-fast: false
-      matrix:
-        use_akv: [false]
-    uses: ./.github/workflows/system-tests.yml
+    uses: ./.github/workflows/system-test.yml
     with:
+      test_path: test_all_seq
       env: acl
-      parallel: false
-      use_akv: ${{ matrix.use_akv }}
+      use_akv: false
