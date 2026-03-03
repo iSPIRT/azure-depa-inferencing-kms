@@ -7,18 +7,18 @@ from endpoints import keyReleasePolicy
 
 
 @pytest.mark.xfail(strict=True) # TODO: Fix #175
-def test_keyReleasePolicy_with_no_policy(setup_kms):
+def test_keyReleasePolicy_with_no_policy(setup_kms_session):
     status_code, key_release_json = keyReleasePolicy()
     assert status_code == 200
 
 
-def test_keyReleasePolicy_with_policy_added(setup_kms):
+def test_keyReleasePolicy_with_policy_added(setup_kms_session):
     apply_key_release_policy()
     status_code, key_release_json = keyReleasePolicy()
     assert status_code == 200
 
 
-def test_keyReleasePolicy_with_policy_added_then_removed(setup_kms):
+def test_keyReleasePolicy_with_policy_added_then_removed(setup_kms_session):
     apply_key_release_policy()
     remove_key_release_policy()
     status_code, key_release_json = keyReleasePolicy()
