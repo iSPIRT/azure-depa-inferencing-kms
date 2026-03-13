@@ -70,7 +70,6 @@ export class JwtValidator implements IValidatorService {
         `isValidJwtToken: ${key}, expected: ${policy[key]}, found: ${jwtProp}, ${compliant}`, this.logContext
       );
 
-      compliant = true;
       if (!compliant) {
         const errorMessage = `The JWT has no valid ${key}, expected: ${policy[key]}, found: ${jwtProp}`;
         Logger.error(errorMessage, this.logContext);
