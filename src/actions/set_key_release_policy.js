@@ -88,11 +88,15 @@ export let action = [
 
             if (items[key] !== undefined) {
               item.forEach((i) => {
-                console.log(`[INFO] [scope=set_key_release_policy->add] KRP add ${type}=>Adding ${i} to ${key}`);
-                items[key].push(i);
+                if (!items[key].includes(i)) {
+                  console.log(`[INFO] [scope=set_key_release_policy->add] KRP add ${type}=>Adding ${i} to ${key}`);
+                  items[key].push(i);
+                } else {
+                  console.log(`[INFO] [scope=set_key_release_policy->add] KRP add ${type}=>Skipping duplicate ${i} in ${key}`);
+                }
               });
             } else {
-              items[key] = item;
+              items[key] = [...new Set(item)];
               console.log(`[INFO] [scope=set_key_release_policy->add] KRP add ${type}=>currrent items: `, items);
             }
           });

@@ -170,4 +170,52 @@ export class KeyRotationPolicy {
     }
     return [false, false];
   }
+
+  /**
+   * Returns the [id, kid] of the latest key that is at least
+   * grace_period_seconds old (so public key clients only see a key
+   * after private key clients have had time to fetch and cache it).
+   * If no delay is configured or delay is 0, returns the actual latest key.
+   *
+   * @param keyRotationPolicyMap - The map containing the key rotation policy.
+   * @param keyIdStoreSize - Number of keys (hpkeKeyIdMap.size).
+   * @param getKidForId - Function to get kid for a given key id.
+   * @param getKeyItem - Function to get key item for a given kid.
+   * @param logContextIn - The log context to use.
+   * @returns [id, kid] of the latest exposable key, or undefined if no keys.
+   */
+  public static getLatestExposableKey(
+    keyRotationPolicyMap: ccfapp.KvMap,
+    keyIdStoreSize: number,
+    getKidForId: (id: number) => string | undefined,
+    getKeyItem: (kid: string) => IKeyItem | undefined,
+    logContextIn: LogContext
+  ): [number, string] | undefined {
+    if (keyIdStoreSize <= 0) return undefined;
+
+    const policy = KeyRotationPolicy.getKeyRotationPolicyFromMap(
+      keyRotationPolicyMap,
+      logContextIn
+    );
+    const delaySeconds = policy?.grace_period_seconds ?? 0;
+    const delayMs = delaySeconds * 1000;
+    const now = Date.now();
+
+    for (let id = keyIdStoreSize; id >= 1; id--) {
+      const kid = getKidForId(id);
+      if (kid === undefined) continue;
+      const keyItem = getKeyItem(kid) as IKeyItem | undefined;
+      if (keyItem === undefined || keyItem.timestamp === undefined) {
+        return [id, kid];
+      }
+      if (delayMs <= 0 || now - keyItem.timestamp >= delayMs) {
+        Logger.debug(
+          `Latest exposable key: id=${id}, kid=${kid}, delay=${delaySeconds}s`,
+          logContextIn
+        );
+        return [id, kid];
+      }
+    }
+    return undefined;
+  }
 }

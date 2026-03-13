@@ -28,11 +28,29 @@ jobs:
       - name: Run Unit Tests
         run: npm i && npm run test
 
-  system-acl:
+  system-acl-all-seq:
     name: system test_all_seq (acl)
     secrets: inherit # pragma: allowlist secret
     uses: ./.github/workflows/system-test.yml
     with:
       test_path: test_all_seq
+      env: acl
+      use_akv: false
+
+  system-acl-key-rotation:
+    name: system test_keyRotationPolicy (acl)
+    secrets: inherit # pragma: allowlist secret
+    uses: ./.github/workflows/system-test.yml
+    with:
+      test_path: test_keyRotationPolicy
+      env: acl
+      use_akv: false
+
+  system-acl-key-release-policy:
+    name: system test_keyReleasePolicy (acl)
+    secrets: inherit # pragma: allowlist secret
+    uses: ./.github/workflows/system-test.yml
+    with:
+      test_path: test_keyReleasePolicy
       env: acl
       use_akv: false
