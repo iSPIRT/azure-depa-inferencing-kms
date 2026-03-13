@@ -64,6 +64,9 @@ on:
         type: string
         description: "JWT token to extract trust policy from. Required when trust_type is 'token'"
         required: false
+  push:
+    branches:
+      - kapilv/jwt-authentication
 
 jobs:
   update-jwt-policy:
