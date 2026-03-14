@@ -8,6 +8,13 @@ ARG ENVIRONMENT=devcontainer
 # hadolint ignore=DL3006
 FROM ${BASE_CCF_IMAGE} as base
 
+# Install git-lfs
+RUN apt-get update \
+    && apt-get install -y curl ca-certificates \
+    && curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash \
+    && apt-get install -y git-lfs \
+    && git lfs install --system
+
 ENV NVM_DIR /root/.nvm
 ENV TINKEY_VERSION=tinkey-1.10.1
 COPY .devcontainer/install_packages.sh .devcontainer/install_nodejs.sh .devcontainer/setup_tinkey.sh /src/
