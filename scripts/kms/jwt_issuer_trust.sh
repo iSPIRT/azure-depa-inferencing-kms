@@ -20,7 +20,7 @@
 #  reproducability and understanding.
 # ------------------------------------------------------------------------------
 
-set -x 
+set -x
 
 REPO_ROOT="$(realpath "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../..")"
 source $REPO_ROOT/scripts/ccf/sign.sh
@@ -213,7 +213,7 @@ jwt-issuer-trust() {
     export JWT_VALIDATION_POLICY="\"validation_policy\": ${JWT_CLAIMS}"
     export ISSUER=$(echo $JWT_CLAIMS | jq -r '.iss')
 
-    if [[ "$KMS_URL" == *"confidential-ledger.azure.com" ]]; then
+    if [[ "$KMS_URL" == *"ispirt.in" ]]; then
         # Do nothing for Azure Confidential Ledger (ACL)
         :
     elif [[ "$TEST_ENVIRONMENT" == "ccf/acl" ]]; then
