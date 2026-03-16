@@ -176,8 +176,11 @@ jwt-issuer-trust:
 	KMS_SERVICE_CERT_PATH=${KMS_SERVICE_CERT_PATH} \
 	KMS_MEMBER_CERT_PATH=${KMS_MEMBER_CERT_PATH} \
 	KMS_MEMBER_PRIVK_PATH=${KMS_MEMBER_PRIVK_PATH} \
+	USE_AKV=${USE_AKV} \
+	AKV_VAULT_NAME=${AKV_VAULT_NAME} \
+	AKV_KEY_NAME=${AKV_KEY_NAME} \
 	DEPLOYMENT_ENV=${DEPLOYMENT_ENV} \
-		./scripts/kms/jwt_issuer_trust.sh --demo
+		./scripts/kms/jwt_issuer_trust.sh ${JWT_TRUST_TYPE} $(JWT_TRUST_ARGS)
 
 # Manage KMS -------------------------------------------------------------------
 
