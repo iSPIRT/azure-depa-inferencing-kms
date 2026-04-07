@@ -76,7 +76,7 @@ jobs:
       - name: Call refresh
         env:
           DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_URL: ${{ inputs.kms_url }}
+          KMS_URL: ${{ inputs.kms_url || 'https://depa-inferencing-kms-azure.ispirt.in' }}
         run: |
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
 
@@ -87,7 +87,7 @@ jobs:
           export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
           curl -X POST ${KMS_URL}/app/refresh --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
-          
+
           # List public keys after refresh
           curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
             -H "Content-Type: application/json" -w '\n' | jq
