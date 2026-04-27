@@ -6,55 +6,50 @@ permissions:
 
 on:
   schedule:
-    # Run every Sunday at 02:00 IST (20:30 Saturday UTC)
+    # Run every Sunday at 02:00 IST (20:30 Saturday UTC) — UAT and Production in parallel
     - cron: '30 20 * * 6'
   workflow_dispatch:
     inputs:
       environment:
         type: choice
-        description: "Target environment (UAT or Production)"
+        description: "Target environment (UAT or Production); ledger/KMS come from that environment's vars (see below)"
         options:
           - UAT
           - Production
         default: Production
-      deployment_name:
-        type: string
-        description: "Name of the deployment"
-        default: "depa-inferencing-kms-prod-cin"
-      kms_url:
-        type: string
-        description: "KMS URL"
-        default: "https://depa-inferencing-kms-azure.ispirt.in"
   workflow_call:
     inputs:
       environment:
         type: string
-        description: "Target environment (UAT or Production)"
+        description: "Target environment (UAT or Production); ledger/KMS come from that environment's vars (see below)"
         default: Production
-      deployment_name:
-        type: string
-        description: "Name of the deployment"
-        default: "depa-inferencing-kms-prod-cin"
-      kms_url:
-        type: string
-        description: "KMS URL"
-        default: "https://depa-inferencing-kms-azure.ispirt.in"
+
+# Required on each GitHub Environment (UAT, Production) — Environment variables:
+#   ACL_DEPLOYMENT_NAME  — Confidential Ledger deployment name
+#   KMS_URL              — HTTPS origin for the KMS app (no path)
 
 jobs:
-  deploy:
-    name: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
+  # Scheduled: refresh UAT and Production in parallel (matrix: one row per environment)
+  refresh-scheduled:
+    if: github.event_name == 'schedule'
+    name: refresh (${{ matrix.environment }})
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [Production, UAT]
     runs-on: ubuntu-latest
     continue-on-error: false
-    environment: ${{ inputs.environment || 'Production' }}
+    environment: ${{ matrix.environment }}
+    env:
+      DEPLOYMENT_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
+      KMS_URL: ${{ vars.KMS_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Install Dependencies
         env:
           GH_TOKEN: ${{ github.token }}
         run: pip install -r requirements.txt
-
       - name: Log into Azure
         uses: azure/login@v2
         with:
@@ -65,18 +60,54 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
       - name: Get service certificate
-        env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
         run: |
-          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
+          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${{ env.DEPLOYMENT_NAME }} \
           | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
-
       - name: Call refresh
+        run: |
+          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
+
+          # List public keys for refresh
+          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
+            -H "Content-Type: application/json" -w '\n' | jq
+
+          export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
+          curl -X POST ${KMS_URL}/app/refresh --cacert ${KMS_SERVICE_CERT_PATH} \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+
+          # List public keys after refresh
+          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
+            -H "Content-Type: application/json" -w '\n' | jq
+
+  # Manual / reusable: one target per run; reads ACL_DEPLOYMENT_NAME and KMS_URL for that environment
+  refresh:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
+    name: refresh (${{ inputs.environment || 'Production' }})
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    environment: ${{ inputs.environment || 'Production' }}
+    env:
+      DEPLOYMENT_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
+      KMS_URL: ${{ vars.KMS_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Dependencies
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_URL: ${{ inputs.kms_url || 'https://depa-inferencing-kms-azure.ispirt.in' }}
+          GH_TOKEN: ${{ github.token }}
+        run: pip install -r requirements.txt
+      - name: Log into Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Get service certificate
+        run: |
+          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${{ env.DEPLOYMENT_NAME }} \
+          | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
+      - name: Call refresh
         run: |
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
 
