@@ -37,7 +37,9 @@ jobs:
       fail-fast: false
       matrix:
         environment: [Production, UAT]
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - ${{ matrix.environment == 'Production' && 'prod' || 'uat' }}
     continue-on-error: false
     environment: ${{ matrix.environment }}
     env:
@@ -84,7 +86,9 @@ jobs:
   refresh:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     name: refresh (${{ inputs.environment || 'Production' }})
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - ${{ inputs.environment == 'UAT' && 'uat' || 'prod' }}
     continue-on-error: false
     environment: ${{ inputs.environment || 'Production' }}
     env:
