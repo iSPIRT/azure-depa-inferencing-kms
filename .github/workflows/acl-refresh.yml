@@ -12,21 +12,20 @@ on:
     inputs:
       environment:
         type: choice
-        description: "Target environment (UAT or Production); ledger/KMS come from that environment's vars (see below)"
+        description: "Target environment (UAT or Production)"
         options:
           - UAT
           - Production
-        default: Production
+        default: UAT
   workflow_call:
     inputs:
       environment:
         type: string
-        description: "Target environment (UAT or Production); ledger/KMS come from that environment's vars (see below)"
-        default: Production
+        description: "Target environment (UAT or Production)"
+        default: UAT
 
 # Required on each GitHub Environment (UAT, Production) — Environment variables:
-#   ACL_DEPLOYMENT_NAME  — Confidential Ledger deployment name
-#   KMS_URL              — HTTPS origin for the KMS app (no path)
+#   ACL_DEPLOYMENT_NAME — Confidential Ledger deployment name
 
 jobs:
   # Scheduled: refresh UAT and Production in parallel (matrix: one row per environment)
@@ -37,19 +36,16 @@ jobs:
       fail-fast: false
       matrix:
         environment: [Production, UAT]
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - ${{ matrix.environment == 'Production' && 'prod' || 'uat' }}
     continue-on-error: false
     environment: ${{ matrix.environment }}
     env:
       DEPLOYMENT_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
-      KMS_URL: ${{ vars.KMS_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Dependencies
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: pip install -r requirements.txt
       - name: Log into Azure
         uses: azure/login@v2
         with:
@@ -66,37 +62,35 @@ jobs:
           | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
       - name: Call refresh
         run: |
-          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
+          set -euo pipefail
+          export KMS_SERVICE_CERT_PATH="${GITHUB_WORKSPACE}/service_cert.pem"
+          KMS_BASE="https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com"
+          KMS_BASE="${KMS_BASE%/}"
 
-          # List public keys for refresh
-          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
+          curl "${KMS_BASE}/app/listpubkeys" --cacert "${KMS_SERVICE_CERT_PATH}" \
             -H "Content-Type: application/json" -w '\n' | jq
 
-          export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
-          curl -X POST ${KMS_URL}/app/refresh --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+          TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
+          curl -X POST "${KMS_BASE}/app/refresh" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" -w '\n' | jq
 
-          # List public keys after refresh
-          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
+          curl "${KMS_BASE}/app/listpubkeys" --cacert "${KMS_SERVICE_CERT_PATH}" \
             -H "Content-Type: application/json" -w '\n' | jq
 
-  # Manual / reusable: one target per run; reads ACL_DEPLOYMENT_NAME and KMS_URL for that environment
+  # Manual / reusable: one target per run
   refresh:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     name: refresh (${{ inputs.environment || 'Production' }})
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - ${{ inputs.environment == 'UAT' && 'uat' || 'prod' }}
     continue-on-error: false
     environment: ${{ inputs.environment || 'Production' }}
     env:
       DEPLOYMENT_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
-      KMS_URL: ${{ vars.KMS_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Dependencies
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: pip install -r requirements.txt
       - name: Log into Azure
         uses: azure/login@v2
         with:
@@ -109,16 +103,17 @@ jobs:
           | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
       - name: Call refresh
         run: |
-          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
+          set -euo pipefail
+          export KMS_SERVICE_CERT_PATH="${GITHUB_WORKSPACE}/service_cert.pem"
+          KMS_BASE="https://${DEPLOYMENT_NAME}.confidential-ledger.azure.com"
+          KMS_BASE="${KMS_BASE%/}"
 
-          # List public keys for refresh
-          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
+          curl "${KMS_BASE}/app/listpubkeys" --cacert "${KMS_SERVICE_CERT_PATH}" \
             -H "Content-Type: application/json" -w '\n' | jq
 
-          export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
-          curl -X POST ${KMS_URL}/app/refresh --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+          TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
+          curl -X POST "${KMS_BASE}/app/refresh" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" -w '\n' | jq
 
-          # List public keys after refresh
-          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
+          curl "${KMS_BASE}/app/listpubkeys" --cacert "${KMS_SERVICE_CERT_PATH}" \
             -H "Content-Type: application/json" -w '\n' | jq
