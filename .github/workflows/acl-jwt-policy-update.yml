@@ -180,6 +180,9 @@ jobs:
         env:
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
         run: |
+          # Self-hosted runners reuse ~/…aclworkspace; az refuses to overwrite an existing --file
+          mkdir -p "$(dirname "${KMS_MEMBER_CERT_PATH}")"
+          rm -f "${KMS_MEMBER_CERT_PATH}"
           az keyvault certificate download \
             --file "${KMS_MEMBER_CERT_PATH}" \
             --vault-name "$AKV_VAULT_NAME" \
