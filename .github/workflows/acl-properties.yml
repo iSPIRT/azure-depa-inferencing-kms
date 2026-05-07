@@ -4,111 +4,91 @@ permissions:
   id-token: write
   contents: read
 
+# GitHub Environment (UAT, Production):
+#   Variables: ACL_DEPLOYMENT_NAME
+#   Secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+# Runners: self-hosted `uat` | `prod`. KMS host: https://{ACL_DEPLOYMENT_NAME}.confidential-ledger.azure.com
+
 on:
   workflow_dispatch:
     inputs:
       environment:
         type: choice
-        description: "Target environment (UAT or Production)"
+        description: "Target Environment"
         options:
           - UAT
           - Production
         default: Production
-      deployment_name:
-        type: string
-        description: "Name of the deployment"
-        default: "depa-inferencing-kms-prod-cin"
-      kms_url:
-        type: string
-        description: "KMS URL"
-        default: "https://depa-inferencing-kms-azure.ispirt.in"
   workflow_call:
     inputs:
       environment:
         type: string
-        description: "Target environment (UAT or Production)"
+        description: "Target Environment"
         default: Production
-      deployment_name:
-        type: string
-        description: "Name of the deployment"
-        default: "depa-inferencing-kms-prod-cin"
-      kms_url:
-        type: string
-        description: "KMS URL"
-        default: "https://depa-inferencing-kms-azure.ispirt.in"
 
 jobs:
   deploy:
-    name: ${{ inputs.deployment_name }}
-    runs-on: ubuntu-latest
+    name: KMS properties — ${{ inputs.environment }}
+    runs-on: ${{ fromJSON((inputs.environment || 'Production') == 'UAT' && '["self-hosted", "uat"]' || '["self-hosted", "prod"]') }}
     continue-on-error: false
     environment: ${{ inputs.environment }}
+    env:
+      DEPLOYMENT_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
+      KMS_URL: https://${{ vars.ACL_DEPLOYMENT_NAME }}.confidential-ledger.azure.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: pip install -r requirements.txt
+      - name: Install runner prerequisites
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl jq
+          if ! command -v az >/dev/null 2>&1; then
+            curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          fi
 
       - name: Log into Azure
         uses: azure/login@v2
         with:
-          # Use a managed identity to authenticate to Azure
-          # Use properties such as client-id, tenant-id, and subscription-id in the secrets and vars
-          # The managed identity should have a federated credential with subject identiier repo:<organization>/<repo>:pull_request
-          # Use subject identifier repo:<organization>/<repo>:ref:refs/heads/<branch> for running manual CI's
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Install Azure CLI confidentialledger extension
+      - name: Validate environment configuration
         run: |
-          az version
-          az extension add --name confidentialledger --yes
+          if [ -z "$DEPLOYMENT_NAME" ]; then
+            echo >&2 "Error: set ACL_DEPLOYMENT_NAME on GitHub Environment '${{ inputs.environment }}'"
+            exit 1
+          fi
 
       - name: Get service certificate
-        env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
         run: |
-          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
-          | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
+          curl -sSf "https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${DEPLOYMENT_NAME}" \
+            | jq -r '.ledgerTlsCertificate' > "${GITHUB_WORKSPACE}/service_cert.pem"
 
       - name: List ledger users
-        env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_URL: ${{ inputs.kms_url }}
         run: |
-          # Get access token for Confidential Ledger
           BEARER_TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com --query accessToken --output tsv)
-          
-          # List all users in the ledger
           echo "Listing all users in the ledger:"
-          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
-          curl ${KMS_URL}/app/ledgerUsers?api-version=2024-08-22-preview \
-            --cacert ${KMS_SERVICE_CERT_PATH} \
+          export KMS_SERVICE_CERT_PATH="${GITHUB_WORKSPACE}/service_cert.pem"
+          curl -sSf "${KMS_URL}/app/ledgerUsers?api-version=2024-08-22-preview" \
+            --cacert "${KMS_SERVICE_CERT_PATH}" \
             -H "Authorization: Bearer ${BEARER_TOKEN}" | jq .
-            
+
       - name: Get policies
-        env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
-          KMS_URL: ${{ inputs.kms_url }}
         run: |
-          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
+          export KMS_SERVICE_CERT_PATH="${GITHUB_WORKSPACE}/service_cert.pem"
           export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
-          curl ${KMS_URL}/app/keyReleasePolicy --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
-          curl ${KMS_URL}/app/settingsPolicy --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
-          curl ${KMS_URL}/app/jwtValidationPolicy --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+          curl -sSf "${KMS_URL}/app/keyReleasePolicy" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" | jq
+          curl -sSf "${KMS_URL}/app/settingsPolicy" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" | jq
+          curl -sSf "${KMS_URL}/app/jwtValidationPolicy" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" | jq
 
       - name: Get public keys
-        env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
-          KMS_URL: ${{ inputs.kms_url }}
         run: |
-          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
-          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Content-Type: application/json" -w '\n' | jq
+          export KMS_SERVICE_CERT_PATH="${GITHUB_WORKSPACE}/service_cert.pem"
+          curl -sSf "${KMS_URL}/app/listpubkeys" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Content-Type: application/json" | jq
