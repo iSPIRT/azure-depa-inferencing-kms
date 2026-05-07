@@ -27,12 +27,21 @@ on:
         description: "Type of JWT trust to configure"
         options:
           - managed-identity
+          - managed-identity-ids
           - aad
           - token
         default: "managed-identity"
       managed_identity_resource_id:
         type: string
         description: "Resource ID of the managed identity (e.g., /subscriptions/.../resourceGroups/.../providers/Microsoft.ManagedIdentity/userAssignedIdentities/...). Required when trust_type is 'managed-identity'"
+        required: false
+      managed_identity_tenant_id:
+        type: string
+        description: "Tenant ID of the managed identity. Required when trust_type is 'managed-identity-ids'"
+        required: false
+      managed_identity_object_id:
+        type: string
+        description: "Object (principal) ID of the managed identity. Required when trust_type is 'managed-identity-ids'"
         required: false
       jwt_token:
         type: string
@@ -54,11 +63,19 @@ on:
         default: "https://depa-inferencing-kms-azure.ispirt.in"
       trust_type:
         type: string
-        description: "Type of JWT trust to configure (managed-identity, aad, or token)"
+        description: "Type of JWT trust to configure (managed-identity, managed-identity-ids, aad, or token)"
         default: "managed-identity"
       managed_identity_resource_id:
         type: string
         description: "Resource ID of the managed identity. Required when trust_type is 'managed-identity'"
+        required: false
+      managed_identity_tenant_id:
+        type: string
+        description: "Tenant ID of the managed identity. Required when trust_type is 'managed-identity-ids'"
+        required: false
+      managed_identity_object_id:
+        type: string
+        description: "Object (principal) ID of the managed identity. Required when trust_type is 'managed-identity-ids'"
         required: false
       jwt_token:
         type: string
@@ -155,11 +172,19 @@ jobs:
         env:
           TRUST_TYPE: ${{ inputs.trust_type || 'managed-identity' }}
           MANAGED_IDENTITY_RESOURCE_ID: ${{ inputs.managed_identity_resource_id }}
+          MANAGED_IDENTITY_TENANT_ID: ${{ inputs.managed_identity_tenant_id }}
+          MANAGED_IDENTITY_OBJECT_ID: ${{ inputs.managed_identity_object_id }}
           JWT_TOKEN: ${{ inputs.jwt_token }}
         run: |
           if [ "$TRUST_TYPE" = "managed-identity" ] && [ -z "$MANAGED_IDENTITY_RESOURCE_ID" ]; then
             echo "Error: managed_identity_resource_id is required when trust_type is 'managed-identity'"
             exit 1
+          fi
+          if [ "$TRUST_TYPE" = "managed-identity-ids" ]; then
+            if [ -z "$MANAGED_IDENTITY_TENANT_ID" ] || [ -z "$MANAGED_IDENTITY_OBJECT_ID" ]; then
+              echo "Error: managed_identity_tenant_id and managed_identity_object_id are required when trust_type is 'managed-identity-ids'"
+              exit 1
+            fi
           fi
           if [ "$TRUST_TYPE" = "token" ] && [ -z "$JWT_TOKEN" ]; then
             echo "Error: jwt_token is required when trust_type is 'token'"
@@ -178,6 +203,8 @@ jobs:
           KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
           TRUST_TYPE: ${{ inputs.trust_type || 'managed-identity' }}
           MANAGED_IDENTITY_RESOURCE_ID: ${{ inputs.managed_identity_resource_id }}
+          MANAGED_IDENTITY_TENANT_ID: ${{ inputs.managed_identity_tenant_id }}
+          MANAGED_IDENTITY_OBJECT_ID: ${{ inputs.managed_identity_object_id }}
           JWT_TOKEN: ${{ inputs.jwt_token }}
         run: |
           if [ "$TRUST_TYPE" = "aad" ]; then
@@ -188,6 +215,10 @@ jobs:
             echo "Updating JWT validation policy from JWT token"
             export JWT_TRUST_TYPE="--token"
             export JWT_TRUST_ARGS="${JWT_TOKEN}"
+          elif [ "$TRUST_TYPE" = "managed-identity-ids" ]; then
+            echo "Updating JWT validation policy with managed identity tenant=$MANAGED_IDENTITY_TENANT_ID object=$MANAGED_IDENTITY_OBJECT_ID"
+            export JWT_TRUST_TYPE="--managed-identity-ids"
+            export JWT_TRUST_ARGS="${MANAGED_IDENTITY_TENANT_ID} ${MANAGED_IDENTITY_OBJECT_ID}"
           else
             echo "Updating JWT validation policy with managed identity: $MANAGED_IDENTITY_RESOURCE_ID"
             export JWT_TRUST_TYPE="--managed-identity"

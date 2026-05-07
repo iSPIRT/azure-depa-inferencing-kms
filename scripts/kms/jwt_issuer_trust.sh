@@ -20,7 +20,7 @@
 #  reproducability and understanding.
 # ------------------------------------------------------------------------------
 
-set -x 
+set -x
 
 REPO_ROOT="$(realpath "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../..")"
 source $REPO_ROOT/scripts/ccf/sign.sh
@@ -125,6 +125,18 @@ jwt-issuer-get-policy-from-mi() {
     }'
 }
 
+jwt-issuer-get-policy-from-mi-ids() {
+    jq -n \
+        --arg tenant_id "$1" \
+        --arg object_id "$2" \
+        '{
+            iss: "https://login.microsoftonline.com/\($tenant_id)/v2.0",
+            sub: $object_id,
+            idtyp: "app",
+            oid: $object_id
+        }'
+}
+
 jwt-issuer-get-policy-from-mi-v1() {
     az identity show --ids $1 | jq '{
         iss: "https://sts.windows.net/\( .tenantId )/",
@@ -189,6 +201,15 @@ jwt-issuer-trust() {
                     $(curl https://login.microsoftonline.com/$(az identity show --ids $2 | jq -r ".tenantId")/discovery/v2.0/keys)`
                 JWT_CLAIMS=`jwt-issuer-get-policy-from-mi-v1 $2`
                 shift 2
+                ;;
+            --managed-identity-ids)
+                CA_CERT_BUNDLE_NAME="Microsoft_AAD"
+                CA_CERT_BUNDLE="$(awk '{printf "%s\\n", $0}' $REPO_ROOT/governance/jwt/aad_cert)"
+                CA_CERT_BUNDLE_NAME_FIELD="\"ca_cert_bundle_name\": \"$CA_CERT_BUNDLE_NAME\","
+                JWKS=`jwt-issuer-get-jwks-from-json \
+                    $(curl https://login.microsoftonline.com/$2/discovery/v2.0/keys)`
+                JWT_CLAIMS=`jwt-issuer-get-policy-from-mi-ids $2 $3`
+                shift 3
                 ;;
             --current-aad-user|--aad)
                 CA_CERT_BUNDLE_NAME="Microsoft_AAD"
