@@ -6,18 +6,15 @@ permissions:
 
 # Each GitHub Environment (UAT, Production) should define:
 #   Variables:
-#     ACL_DEPLOYMENT_NAME — Confidential Ledger deployment name (same as ACL / KMS ledger id)
-#     KMS_URL             — HTTPS origin for the KMS app (no path), reachable from the runner
+#     ACL_DEPLOYMENT_NAME — Confidential Ledger name (ledger id); used for TLS identity,
+#       and KMS_URL for this job is always https://{ACL_DEPLOYMENT_NAME}.confidential-ledger.azure.com
+#       so self-hosted runners reach the service like depa-inferencing kms_policy_update (no custom DNS).
 #   Secrets:
 #     AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID — federated login for automation
 #     AZURE_KEY_VAULT_NAME — vault holding the member cert for proposal signing
 #
 # Runners: use self-hosted agents labeled `uat` or `prod` so they can reach private Key Vault
-# and Confidential Ledger like other ACL workflows (similar to depa-inferencing kms_policy_update).
-#
-# jwt_issuer_trust skips ledger CA / jwt_issuer governance proposals when ACL_DEPLOYMENT_NAME
-# resolves via identity.confidential-ledger.core.azure.com (same as ledger name), even if
-# KMS_URL is a custom hostname.
+# and Confidential Ledger (public Azure ledger hostname).
 
 on:
   workflow_dispatch:
@@ -95,7 +92,9 @@ jobs:
     continue-on-error: false
     env:
       DEPLOYMENT_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
-      KMS_URL: ${{ vars.KMS_URL }}
+      # Same pattern as depa-inferencing key-release: call /app/* on the ledger host, not a vanity
+      # domain that runners may not resolve.
+      KMS_URL: https://${{ vars.ACL_DEPLOYMENT_NAME }}.confidential-ledger.azure.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -145,8 +144,8 @@ jobs:
           MI_PRINCIPAL_ID: ${{ inputs.mi_principal_id }}
           JWT_TOKEN: ${{ inputs.jwt_token }}
         run: |
-          if [ -z "$DEPLOYMENT_NAME" ] || [ -z "$KMS_URL" ]; then
-            echo "Error: set ACL_DEPLOYMENT_NAME and KMS_URL on GitHub Environment '${{ inputs.environment }}'"
+          if [ -z "$DEPLOYMENT_NAME" ]; then
+            echo >&2 "Error: set ACL_DEPLOYMENT_NAME on GitHub Environment '${{ inputs.environment }}'"
             exit 1
           fi
 
