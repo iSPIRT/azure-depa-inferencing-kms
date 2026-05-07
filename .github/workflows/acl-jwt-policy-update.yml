@@ -34,7 +34,7 @@ on:
           - managed-identity-v1 # MI from Azure with v1 API
           - aad # AAD token
           - token # Custom JWT token
-        default: managed-identity
+        default: managed-identity-v1
       managed_identity_resource_id:
         type: string
         description: "ARM resource id of the UAMI (optional if mi_tenant_id + mi_principal_id are set, for v1 API)"
@@ -65,7 +65,7 @@ on:
       trust_type:
         type: string
         description: "Identity type"
-        default: managed-identity
+        default: managed-identity-v1
       managed_identity_resource_id:
         type: string
         description: "ARM resource id of the UAMI (optional if mi_tenant_id + mi_principal_id set, for v1 API)"

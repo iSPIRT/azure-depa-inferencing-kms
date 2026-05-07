@@ -25,8 +25,11 @@ on:
         default: Production
 
 # Required on each GitHub Environment (UAT, Production) — Environment variables:
-#   ACL_DEPLOYMENT_NAME  — Ledger name (Confidential Ledger deployment name)
-#   KMS_URL              — HTTPS origin for the KMS app (no path)
+#   ACL_DEPLOYMENT_NAME — Confidential Ledger name; KMS base URL for /app/* calls is
+#     https://{ACL_DEPLOYMENT_NAME}.confidential-ledger.azure.com (same as jwt policy workflow).
+#
+# If your ledger is only reachable from a private network, switch runs-on to self-hosted
+# (e.g. uat/prod labels) like acl-jwt-policy-update.yml — ubuntu-latest must reach the host.
 
 jobs:
   # Scheduled: refresh UAT and Production in parallel (matrix: one row per environment)
@@ -42,7 +45,7 @@ jobs:
     environment: ${{ matrix.environment }}
     env:
       DEPLOYMENT_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
-      KMS_URL: ${{ vars.KMS_URL }}
+      KMS_URL: https://${{ vars.ACL_DEPLOYMENT_NAME }}.confidential-ledger.azure.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,27 +63,33 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Ensure environment is configured
+        run: |
+          if [ -z "${{ env.DEPLOYMENT_NAME }}" ]; then
+            echo >&2 "Error: set ACL_DEPLOYMENT_NAME on GitHub Environment '${{ matrix.environment }}'"
+            exit 1
+          fi
       - name: Get service certificate
         run: |
-          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${{ env.DEPLOYMENT_NAME }} \
-          | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
+          curl -sSf "https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${{ env.DEPLOYMENT_NAME }}" \
+            | jq -r '.ledgerTlsCertificate' > "${GITHUB_WORKSPACE}/service_cert.pem"
       - name: Call refresh
         run: |
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
 
           # List public keys for refresh
-          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Content-Type: application/json" -w '\n' | jq
+          curl -sSf "${KMS_URL}/app/listpubkeys" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Content-Type: application/json" | jq
 
           export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
-          curl -X POST ${KMS_URL}/app/refresh --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+          curl -sSf -X POST "${KMS_URL}/app/refresh" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" | jq
 
           # List public keys after refresh
-          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Content-Type: application/json" -w '\n' | jq
+          curl -sSf "${KMS_URL}/app/listpubkeys" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Content-Type: application/json" | jq
 
-  # Manual / reusable: one target per run; reads ACL_DEPLOYMENT_NAME and KMS_URL for that environment
+  # Manual / reusable: one target per run; reads ACL_DEPLOYMENT_NAME for that environment
   refresh:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     name: refresh (${{ inputs.environment || 'Production' }})
@@ -89,7 +98,7 @@ jobs:
     environment: ${{ inputs.environment || 'Production' }}
     env:
       DEPLOYMENT_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
-      KMS_URL: ${{ vars.KMS_URL }}
+      KMS_URL: https://${{ vars.ACL_DEPLOYMENT_NAME }}.confidential-ledger.azure.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -103,22 +112,28 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Ensure environment is configured
+        run: |
+          if [ -z "${{ env.DEPLOYMENT_NAME }}" ]; then
+            echo >&2 "Error: set ACL_DEPLOYMENT_NAME on GitHub Environment '${{ inputs.environment || 'Production' }}'"
+            exit 1
+          fi
       - name: Get service certificate
         run: |
-          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${{ env.DEPLOYMENT_NAME }} \
-          | jq -r '.ledgerTlsCertificate' > ${GITHUB_WORKSPACE}/service_cert.pem
+          curl -sSf "https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${{ env.DEPLOYMENT_NAME }}" \
+            | jq -r '.ledgerTlsCertificate' > "${GITHUB_WORKSPACE}/service_cert.pem"
       - name: Call refresh
         run: |
           export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
 
           # List public keys for refresh
-          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Content-Type: application/json" -w '\n' | jq
+          curl -sSf "${KMS_URL}/app/listpubkeys" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Content-Type: application/json" | jq
 
           export TOKEN=$(az account get-access-token --resource https://confidential-ledger.azure.com | jq -r '.accessToken')
-          curl -X POST ${KMS_URL}/app/refresh --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -w '\n' | jq
+          curl -sSf -X POST "${KMS_URL}/app/refresh" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" | jq
 
           # List public keys after refresh
-          curl ${KMS_URL}/app/listpubkeys --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Content-Type: application/json" -w '\n' | jq
+          curl -sSf "${KMS_URL}/app/listpubkeys" --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Content-Type: application/json" | jq
