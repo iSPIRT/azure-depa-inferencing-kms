@@ -28,8 +28,8 @@ on:
 #   ACL_DEPLOYMENT_NAME — Confidential Ledger name; KMS base URL for /app/* calls is
 #     https://{ACL_DEPLOYMENT_NAME}.confidential-ledger.azure.com (same as jwt policy workflow).
 #
-# If your ledger is only reachable from a private network, switch runs-on to self-hosted
-# (e.g. uat/prod labels) like acl-jwt-policy-update.yml — ubuntu-latest must reach the host.
+# Runners: self-hosted agents labeled `uat` or `prod` per GitHub Environment (same as
+# acl-jwt-policy-update) so refresh reaches private ledger endpoints.
 
 jobs:
   # Scheduled: refresh UAT and Production in parallel (matrix: one row per environment)
@@ -40,7 +40,7 @@ jobs:
       fail-fast: false
       matrix:
         environment: [Production, UAT]
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(matrix.environment == 'UAT' && '["self-hosted", "uat"]' || '["self-hosted", "prod"]') }}
     continue-on-error: false
     environment: ${{ matrix.environment }}
     env:
@@ -93,7 +93,7 @@ jobs:
   refresh:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     name: refresh (${{ inputs.environment || 'Production' }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON((inputs.environment || 'Production') == 'UAT' && '["self-hosted", "uat"]' || '["self-hosted", "prod"]') }}
     continue-on-error: false
     environment: ${{ inputs.environment || 'Production' }}
     env:
