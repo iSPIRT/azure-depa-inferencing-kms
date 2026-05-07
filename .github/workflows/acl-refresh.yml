@@ -25,7 +25,7 @@ on:
         default: Production
 
 # Required on each GitHub Environment (UAT, Production) — Environment variables:
-#   ACL_DEPLOYMENT_NAME  — Confidential Ledger deployment name
+#   ACL_DEPLOYMENT_NAME  — Ledger name (Confidential Ledger deployment name)
 #   KMS_URL              — HTTPS origin for the KMS app (no path)
 
 jobs:

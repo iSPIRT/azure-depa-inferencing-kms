@@ -14,6 +14,10 @@ permissions:
 #
 # Runners: use self-hosted agents labeled `uat` or `prod` so they can reach private Key Vault
 # and Confidential Ledger like other ACL workflows (similar to depa-inferencing kms_policy_update).
+#
+# jwt_issuer_trust skips ledger CA / jwt_issuer governance proposals when ACL_DEPLOYMENT_NAME
+# resolves via identity.confidential-ledger.core.azure.com (same as ledger name), even if
+# KMS_URL is a custom hostname.
 
 on:
   workflow_dispatch:

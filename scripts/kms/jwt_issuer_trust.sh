@@ -262,8 +262,31 @@ jwt-issuer-trust() {
     export JWT_VALIDATION_POLICY="\"validation_policy\": ${JWT_CLAIMS}"
     export ISSUER=$(echo $JWT_CLAIMS | jq -r '.iss')
 
-    if [[ "$KMS_URL" == *"confidential-ledger.azure.com" ]]; then
-        # Do nothing for Azure Confidential Ledger (ACL)
+    # ACL: CA bundle + JWT issuer are ledger-level; routine updates only need
+    # set_jwt_validation_policy (app proposal). Detect ACL by canonical hostname
+    # or by ledger name: same URL used to fetch the service cert
+    # (identity.confidential-ledger.core.azure.com/ledgerIdentity/{name}).
+    # Optional: KMS_FORCE_JWT_GOV_CA_ISSUER=1 to always submit CA + jwt_issuer
+    # proposals. Optional: KMS_SKIP_JWT_CA_AND_ISSUER=1 if identity API is
+    # unreachable but KMS_URL is not *.confidential-ledger.azure.com.
+    skip_gov_jwt_setup=false
+    if [[ "${KMS_FORCE_JWT_GOV_CA_ISSUER:-}" == "true" ]] || [[ "${KMS_FORCE_JWT_GOV_CA_ISSUER:-}" == "1" ]]; then
+        skip_gov_jwt_setup=false
+    elif [[ "${KMS_SKIP_JWT_CA_AND_ISSUER:-}" == "true" ]] || [[ "${KMS_SKIP_JWT_CA_AND_ISSUER:-}" == "1" ]]; then
+        skip_gov_jwt_setup=true
+    elif [[ "$KMS_URL" == *"confidential-ledger.azure.com"* ]]; then
+        skip_gov_jwt_setup=true
+    else
+        _ledger_name="${ACL_DEPLOYMENT_NAME:-${DEPLOYMENT_NAME:-}}"
+        if [[ -n "$_ledger_name" ]] && command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+            if curl -sf "https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${_ledger_name}" \
+                | jq -e '.ledgerTlsCertificate | type == "string" and length > 0' >/dev/null 2>&1; then
+                skip_gov_jwt_setup=true
+            fi
+        fi
+    fi
+
+    if [[ "$skip_gov_jwt_setup" == "true" ]]; then
         :
     elif [[ "$TEST_ENVIRONMENT" == "ccf/acl" ]]; then
         ccf-member-add `az account show | jq -r '.id'` '["Reader"]'

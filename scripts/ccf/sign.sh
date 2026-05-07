@@ -51,11 +51,22 @@ ccf-sign() {
             --content $content \
             --signing-cert ${KMS_MEMBER_CERT_PATH} \
             $extra_args \
-            | curl -X POST -s \
+            | curl -X POST -sS -f \
                 -H "Authorization: Bearer $bearer_token" \
                 -H "Content-Type: application/json" \
                 "${AKV_URL}/sign?api-version=7.2" \
-                -d @- > $signature
+                -d @- > $signature \
+            || {
+                echo "ccf-sign: Key Vault sign request failed (HTTP or network)" >&2
+                rm -f "$signature"
+                exit 1
+            }
+        if jq -e '.error' "$signature" >/dev/null 2>&1; then
+            echo "ccf-sign: Key Vault returned an error:" >&2
+            jq . "$signature" >&2
+            rm -f "$signature"
+            exit 1
+        fi
         ccf_cose_sign1_finish \
             --ccf-gov-msg-type $msg_type \
             --ccf-gov-msg-created_at $creation_time \
