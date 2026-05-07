@@ -134,6 +134,37 @@ jwt-issuer-get-policy-from-mi-v1() {
     }'
 }
 
+# When only Entra tenant id and managed identity principal (object) id are known
+# (e.g. client-virtual-node / cleanroom MI), without an ARM resource id for
+# az identity show.
+jwt-issuer-get-policy-from-tenant-principal-v2() {
+    local tenant_id="$1"
+    local principal_id="$2"
+    jq -n \
+        --arg tid "$tenant_id" \
+        --arg pid "$principal_id" \
+        '{
+            iss: ("https://login.microsoftonline.com/" + $tid + "/v2.0"),
+            sub: $pid,
+            idtyp: "app",
+            oid: $pid
+        }'
+}
+
+jwt-issuer-get-policy-from-tenant-principal-v1() {
+    local tenant_id="$1"
+    local principal_id="$2"
+    jq -n \
+        --arg tid "$tenant_id" \
+        --arg pid "$principal_id" \
+        '{
+            iss: ("https://sts.windows.net/" + $tid + "/"),
+            sub: $pid,
+            idtyp: "app",
+            oid: $pid
+        }'
+}
+
 jwt-issuer-get-policy-from-current-aad-user() {
     jwt-issuer-get-policy-from-token ` \
         az account get-access-token \
@@ -189,6 +220,24 @@ jwt-issuer-trust() {
                     $(curl https://login.microsoftonline.com/$(az identity show --ids $2 | jq -r ".tenantId")/discovery/v2.0/keys)`
                 JWT_CLAIMS=`jwt-issuer-get-policy-from-mi-v1 $2`
                 shift 2
+                ;;
+            --managed-identity-by-ids)
+                CA_CERT_BUNDLE_NAME="Microsoft_AAD"
+                CA_CERT_BUNDLE="$(awk '{printf "%s\\n", $0}' $REPO_ROOT/governance/jwt/aad_cert)"
+                CA_CERT_BUNDLE_NAME_FIELD="\"ca_cert_bundle_name\": \"$CA_CERT_BUNDLE_NAME\","
+                JWKS=`jwt-issuer-get-jwks-from-json \
+                    $(curl -sSf "https://login.microsoftonline.com/$2/discovery/v2.0/keys")`
+                JWT_CLAIMS=`jwt-issuer-get-policy-from-tenant-principal-v2 "$2" "$3"`
+                shift 3
+                ;;
+            --managed-identity-by-ids-v1)
+                CA_CERT_BUNDLE_NAME="Microsoft_AAD"
+                CA_CERT_BUNDLE="$(awk '{printf "%s\\n", $0}' $REPO_ROOT/governance/jwt/aad_cert)"
+                CA_CERT_BUNDLE_NAME_FIELD="\"ca_cert_bundle_name\": \"$CA_CERT_BUNDLE_NAME\","
+                JWKS=`jwt-issuer-get-jwks-from-json \
+                    $(curl -sSf "https://login.microsoftonline.com/$2/discovery/v2.0/keys")`
+                JWT_CLAIMS=`jwt-issuer-get-policy-from-tenant-principal-v1 "$2" "$3"`
+                shift 3
                 ;;
             --current-aad-user|--aad)
                 CA_CERT_BUNDLE_NAME="Microsoft_AAD"
