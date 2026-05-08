@@ -4,34 +4,48 @@ permissions:
   id-token: write
   contents: read
 
+# GitHub Environment (UAT, Production):
+#   Variables: ACL_DEPLOYMENT_NAME (must match Confidential Ledger resource name)
+#   Secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
+#     AZURE_LOG_ANALYTICS_RESOURCE_GROUP, AZURE_LOG_ANALYTICS_WORKSPACE_NAME
+# Runners: self-hosted `uat` | `prod` (Azure RM / private as needed)
+
 on:
   workflow_dispatch:
     inputs:
       environment:
         type: choice
-        description: "Target environment (UAT or Production)"
+        description: "Target Environment"
         options:
           - UAT
           - Production
         default: Production
-      ledger_name:
-        type: string
-        description: "Confidential Ledger name"
-        required: true
 
 jobs:
   setup-logging:
-    name: Setup ACL Logging
-    runs-on: self-hosted
+    name: Setup ACL logging — ${{ inputs.environment }}
+    runs-on: ${{ fromJSON((inputs.environment || 'Production') == 'UAT' && '["self-hosted", "uat"]' || '["self-hosted", "prod"]') }}
     continue-on-error: false
     environment: ${{ inputs.environment }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Azure CLI
+      - name: Validate environment configuration
         run: |
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          if [ -z "${{ vars.ACL_DEPLOYMENT_NAME }}" ]; then
+            echo >&2 "Error: set ACL_DEPLOYMENT_NAME on GitHub Environment '${{ inputs.environment }}'"
+            exit 1
+          fi
+
+      - name: Install runner prerequisites
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl
+          if ! command -v az >/dev/null 2>&1; then
+            curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          fi
 
       - name: Log into Azure
         uses: azure/login@v2
@@ -42,12 +56,11 @@ jobs:
 
       - name: Install PowerShell
         run: |
-          # Install PowerShell
-          curl -L -o /tmp/powershell.tar.gz https://github.com/PowerShell/PowerShell/releases/download/v7.4.2/powershell-7.4.2-linux-x64.tar.gz
+          curl -fsSL -o /tmp/powershell.tar.gz https://github.com/PowerShell/PowerShell/releases/download/v7.4.2/powershell-7.4.2-linux-x64.tar.gz
           sudo mkdir -p /opt/microsoft/powershell/7
           sudo tar zxf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7
           sudo chmod +x /opt/microsoft/powershell/7/pwsh
-          sudo ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
+          sudo ln -sf /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
           pwsh --version
 
       - name: Install Az PowerShell Module
@@ -58,36 +71,36 @@ jobs:
         env:
           SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           RESOURCE_GROUP: ${{ secrets.AZURE_LOG_ANALYTICS_RESOURCE_GROUP }}
-          LEDGER_NAME: ${{ inputs.ledger_name }}
+          LEDGER_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
           LOG_ANALYTICS_WORKSPACE_NAME: ${{ secrets.AZURE_LOG_ANALYTICS_WORKSPACE_NAME }}
         run: |
           pwsh -Command "
             # Set error action preference
             `$ErrorActionPreference = 'Stop'
-            
+
             # Construct ledger resource ID
             `$ledger = \"/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ConfidentialLedger/Ledgers/$LEDGER_NAME\"
-            
+
             Write-Host \"🔍 Retrieving diagnostic setting categories for ledger: `$ledger\"
-            
+
             # Retrieve the category of logs available
             `$categories = Get-AzDiagnosticSettingCategory -ResourceId `$ledger
             Write-Host \"Available categories:\"
             `$categories | Format-Table -AutoSize
-            
+
             # Set up transaction logs
             Write-Host \"📝 Setting up transaction logs...\"
             `$logtxn = New-AzDiagnosticSettingLogSettingsObject -Enabled `$true -Category transactionlogs
-            
+
             # Set up user-defined logs
             Write-Host \"📝 Setting up user-defined logs...\"
             `$logudf = New-AzDiagnosticSettingLogSettingsObject -Enabled `$true -Category userdefinedlogs
-            
+
             # Set up logs directly with Log Analytics (if provided)
             if ('$LOG_ANALYTICS_WORKSPACE_NAME' -ne '') {
               Write-Host \"📊 Configuring logs with Log Analytics Workspace: $LOG_ANALYTICS_WORKSPACE_NAME\"
               `$workspaceId = \"/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.operationalinsights/workspaces/$LOG_ANALYTICS_WORKSPACE_NAME\"
-              
+
               try {
                 New-AzDiagnosticSetting -ResourceId `$ledger -Name TXN_LOGS_LA -WorkspaceId `$workspaceId -Log `$logtxn -ErrorAction Stop
                 Write-Host \"✅ Successfully configured transaction logs with Log Analytics Workspace\"
@@ -97,7 +110,7 @@ jobs:
             } else {
               Write-Host \"⏭️  Skipping Log Analytics configuration (not provided)\"
             }
-            
+
             # Check existing configurations
             Write-Host \"🔍 Checking existing diagnostic settings...\"
             `$existingSettings = Get-AzDiagnosticSetting -ResourceId `$ledger
@@ -107,6 +120,6 @@ jobs:
             } else {
               Write-Host \"No diagnostic settings found.\"
             }
-            
+
             Write-Host \"✅ Logging configuration completed!\"
           "

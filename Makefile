@@ -180,6 +180,8 @@ jwt-issuer-trust:
 	AKV_VAULT_NAME=${AKV_VAULT_NAME} \
 	AKV_KEY_NAME=${AKV_KEY_NAME} \
 	DEPLOYMENT_ENV=${DEPLOYMENT_ENV} \
+	DEPLOYMENT_NAME=${DEPLOYMENT_NAME} \
+	ACL_DEPLOYMENT_NAME=${ACL_DEPLOYMENT_NAME} \
 		./scripts/kms/jwt_issuer_trust.sh ${JWT_TRUST_TYPE} $(JWT_TRUST_ARGS)
 
 # Manage KMS -------------------------------------------------------------------

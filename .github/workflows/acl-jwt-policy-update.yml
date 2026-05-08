@@ -1,76 +1,100 @@
-name: Update JWT Validation Policy
+name: Update JWT validation policy
 
 permissions:
   id-token: write
   contents: read
+
+# Each GitHub Environment (UAT, Production) should define:
+#   Variables:
+#     ACL_DEPLOYMENT_NAME — Confidential Ledger name (ledger id); used for TLS identity,
+#       and KMS_URL for this job is always https://{ACL_DEPLOYMENT_NAME}.confidential-ledger.azure.com
+#       so self-hosted runners reach the service like depa-inferencing kms_policy_update (no custom DNS).
+#   Secrets:
+#     AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID — federated login for automation
+#     AZURE_KEY_VAULT_NAME — vault holding the member cert for proposal signing
+#
+# Runners: use self-hosted agents labeled `uat` or `prod` so they can reach private Key Vault
+# and Confidential Ledger (public Azure ledger hostname).
 
 on:
   workflow_dispatch:
     inputs:
       environment:
         type: choice
-        description: "Target environment (UAT or Production)"
+        description: "GitHub Environment"
         options:
           - UAT
           - Production
         default: Production
-      deployment_name:
-        type: string
-        description: "Name of the deployment to update JWT policy for"
-        default: "depa-inferencing-kms-prod-cin"
-      kms_url:
-        type: string
-        description: "KMS URL"
-        default: "https://depa-inferencing-kms-azure.ispirt.in"
       trust_type:
         type: choice
-        description: "Type of JWT trust to configure"
+        description: "How to derive the JWT validation policy"
         options:
-          - managed-identity
-          - aad
-          - token
-        default: "managed-identity"
+          - managed-identity # MI from Azure
+          - managed-identity-v1 # MI from Azure with v1 API
+          - aad # AAD token
+          - token # Custom JWT token
+        default: managed-identity-v1
       managed_identity_resource_id:
         type: string
-        description: "Resource ID of the managed identity (e.g., /subscriptions/.../resourceGroups/.../providers/Microsoft.ManagedIdentity/userAssignedIdentities/...). Required when trust_type is 'managed-identity'"
+        description: "ARM resource id of the UAMI (optional if mi_tenant_id + mi_principal_id are set, for v1 API)"
         required: false
+        default: ""
+      mi_tenant_id:
+        type: string
+        description: "Tenant ID of the client MI (e.g. virtual node / cleanroom identity)"
+        required: false
+        default: ""
+      mi_principal_id:
+        type: string
+        description: "Principal (object) id of the MI"
+        required: false
+        default: ""
       jwt_token:
         type: string
-        description: "JWT token to extract trust policy from. Required when trust_type is 'token'"
+        description: "Sample JWT to copy claims from (required when trust_type is token)"
         required: false
+        default: ""
+
   workflow_call:
     inputs:
       environment:
         type: string
-        description: "Target environment (UAT or Production)"
+        description: "GitHub Environment"
         default: Production
-      deployment_name:
-        type: string
-        description: "Name of the deployment to update JWT policy for"
-        default: "depa-inferencing-kms-prod-cin"
-      kms_url:
-        type: string
-        description: "KMS URL"
-        default: "https://depa-inferencing-kms-azure.ispirt.in"
       trust_type:
         type: string
-        description: "Type of JWT trust to configure (managed-identity, aad, or token)"
-        default: "managed-identity"
+        description: "Identity type"
+        default: managed-identity-v1
       managed_identity_resource_id:
         type: string
-        description: "Resource ID of the managed identity. Required when trust_type is 'managed-identity'"
+        description: "ARM resource id of the UAMI (optional if mi_tenant_id + mi_principal_id set, for v1 API)"
         required: false
+        default: ""
+      mi_tenant_id:
+        type: string
+        required: false
+        default: ""
+      mi_principal_id:
+        type: string
+        required: false
+        default: ""
       jwt_token:
         type: string
-        description: "JWT token to extract trust policy from. Required when trust_type is 'token'"
         required: false
+        default: ""
 
 jobs:
   update-jwt-policy:
-    name: Update JWT Policy for ${{ inputs.deployment_name }}
-    runs-on: self-hosted
+    name: JWT policy — ${{ inputs.environment }}
+    runs-on: ${{ fromJSON(inputs.environment == 'UAT' && '["self-hosted", "uat"]' || '["self-hosted", "prod"]') }}
     environment: ${{ inputs.environment }}
     continue-on-error: false
+    env:
+      DEPLOYMENT_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}
+      # Same pattern as depa-inferencing key-release: call /app/* on the ledger host, not a vanity
+      # domain that runners may not resolve.
+      KMS_URL: https://${{ vars.ACL_DEPLOYMENT_NAME }}.confidential-ledger.azure.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,18 +106,13 @@ jobs:
 
       - name: Setup Python virtual environment
         run: |
-          # Create virtual environment
           python3 -m venv ccf_env
-
-          # Activate virtual environment and install CCF
           source ccf_env/bin/activate
           pip install --upgrade pip
           pip install ccf==6.0.10
-
-          # Add virtual environment to PATH for subsequent steps
           echo "ccf_env/bin" >> $GITHUB_PATH
 
-      - name: Install Dependencies
+      - name: Install dependencies
         env:
           GH_TOKEN: ${{ github.token }}
         run: pip3 install -r requirements.txt
@@ -105,104 +124,118 @@ jobs:
       - name: Log into Azure
         uses: azure/login@v2
         with:
-          # Use a managed identity to authenticate to Azure
-          # Use properties such as client-id, tenant-id, and subscription-id in the secrets and vars
-          # The managed identity should have a federated credential with subject identifier repo:<organization>/<repo>:pull_request
-          # Use subject identifier repo:<organization>/<repo>:ref:refs/heads/<branch> for running manual CI's
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Install Azure CLI confidentialledger extension
-        run: |
-          az version
-          az extension add --name confidentialledger --yes
-
-      - name: Setup environment variables
-        env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_URL: ${{ inputs.kms_url }}
+      - name: Setup workspace paths
         run: |
           export KMS_WORKSPACE=~/$DEPLOYMENT_NAME.aclworkspace
-          mkdir -p $KMS_WORKSPACE/proposals
+          mkdir -p "$KMS_WORKSPACE/proposals"
           echo "KMS_WORKSPACE=$KMS_WORKSPACE" >> $GITHUB_ENV
-          export KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem
-          echo "KMS_SERVICE_CERT_PATH=$KMS_SERVICE_CERT_PATH" >> $GITHUB_ENV
-          export KMS_MEMBER_CERT_PATH=${KMS_WORKSPACE}/member_cert.pem
-          echo "KMS_MEMBER_CERT_PATH=${KMS_MEMBER_CERT_PATH}" >> $GITHUB_ENV
+          echo "KMS_SERVICE_CERT_PATH=${GITHUB_WORKSPACE}/service_cert.pem" >> $GITHUB_ENV
+          echo "KMS_MEMBER_CERT_PATH=$KMS_WORKSPACE/member_cert.pem" >> $GITHUB_ENV
 
-      - name: Get service certificate
+      - name: Validate environment configuration
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
+          TRUST_TYPE: ${{ inputs.trust_type }}
+          MANAGED_IDENTITY_RESOURCE_ID: ${{ inputs.managed_identity_resource_id }}
+          MI_TENANT_ID: ${{ inputs.mi_tenant_id }}
+          MI_PRINCIPAL_ID: ${{ inputs.mi_principal_id }}
+          JWT_TOKEN: ${{ inputs.jwt_token }}
         run: |
-          curl https://identity.confidential-ledger.core.azure.com/ledgerIdentity/$DEPLOYMENT_NAME \
-          | jq -r '.ledgerTlsCertificate' > ${KMS_SERVICE_CERT_PATH}
+          if [ -z "$DEPLOYMENT_NAME" ]; then
+            echo >&2 "Error: set ACL_DEPLOYMENT_NAME on GitHub Environment '${{ inputs.environment }}'"
+            exit 1
+          fi
+
+          case "${TRUST_TYPE}" in
+            token)
+              if [ -z "$JWT_TOKEN" ]; then
+                echo "Error: jwt_token is required when trust_type is token"
+                exit 1
+              fi
+              ;;
+            aad)
+              ;;
+            managed-identity|managed-identity-v1)
+              if [ -n "$MANAGED_IDENTITY_RESOURCE_ID" ]; then
+                :
+              elif [ -n "$MI_TENANT_ID" ] && [ -n "$MI_PRINCIPAL_ID" ]; then
+                :
+              else
+                echo "Error: for ${TRUST_TYPE} provide managed_identity_resource_id, or both mi_tenant_id and mi_principal_id"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Error: unknown trust_type ${TRUST_TYPE}"
+              exit 1
+              ;;
+          esac
+
+      - name: Fetch ledger TLS certificate
+        run: |
+          curl -sSf "https://identity.confidential-ledger.core.azure.com/ledgerIdentity/${DEPLOYMENT_NAME}" \
+            | jq -r '.ledgerTlsCertificate' > "${KMS_SERVICE_CERT_PATH}"
 
       - name: Download member certificate from Key Vault
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
         run: |
+          # Self-hosted runners reuse ~/…aclworkspace; az refuses to overwrite an existing --file
+          mkdir -p "$(dirname "${KMS_MEMBER_CERT_PATH}")"
+          rm -f "${KMS_MEMBER_CERT_PATH}"
           az keyvault certificate download \
-            --file ${KMS_MEMBER_CERT_PATH} \
-            --vault-name $AKV_VAULT_NAME \
-            --name ${DEPLOYMENT_NAME}-member-cert
-
-      - name: Validate inputs
-        env:
-          TRUST_TYPE: ${{ inputs.trust_type || 'managed-identity' }}
-          MANAGED_IDENTITY_RESOURCE_ID: ${{ inputs.managed_identity_resource_id }}
-          JWT_TOKEN: ${{ inputs.jwt_token }}
-        run: |
-          if [ "$TRUST_TYPE" = "managed-identity" ] && [ -z "$MANAGED_IDENTITY_RESOURCE_ID" ]; then
-            echo "Error: managed_identity_resource_id is required when trust_type is 'managed-identity'"
-            exit 1
-          fi
-          if [ "$TRUST_TYPE" = "token" ] && [ -z "$JWT_TOKEN" ]; then
-            echo "Error: jwt_token is required when trust_type is 'token'"
-            exit 1
-          fi
+            --file "${KMS_MEMBER_CERT_PATH}" \
+            --vault-name "$AKV_VAULT_NAME" \
+            --name "${DEPLOYMENT_NAME}-member-cert"
 
       - name: Update JWT validation policy
         env:
-          DEPLOYMENT_NAME: ${{ inputs.deployment_name || 'depa-inferencing-kms-prod-cin' }}
-          KMS_URL: ${{ env.KMS_URL }}
-          KMS_WORKSPACE: ${{ env.KMS_WORKSPACE }}
           USE_AKV: "true"
           AKV_VAULT_NAME: ${{ secrets.AZURE_KEY_VAULT_NAME }}
-          AKV_KEY_NAME: ${{ inputs.deployment_name }}-member-cert
-          KMS_MEMBER_CERT_PATH: ${{ env.KMS_MEMBER_CERT_PATH }}
-          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
-          TRUST_TYPE: ${{ inputs.trust_type || 'managed-identity' }}
+          AKV_KEY_NAME: ${{ vars.ACL_DEPLOYMENT_NAME }}-member-cert
+          TRUST_TYPE: ${{ inputs.trust_type }}
           MANAGED_IDENTITY_RESOURCE_ID: ${{ inputs.managed_identity_resource_id }}
+          MI_TENANT_ID: ${{ inputs.mi_tenant_id }}
+          MI_PRINCIPAL_ID: ${{ inputs.mi_principal_id }}
           JWT_TOKEN: ${{ inputs.jwt_token }}
         run: |
-          if [ "$TRUST_TYPE" = "aad" ]; then
-            echo "Updating JWT validation policy with AAD (current Azure user)"
-            export JWT_TRUST_TYPE="--aad"
-            export JWT_TRUST_ARGS=""
-          elif [ "$TRUST_TYPE" = "token" ]; then
-            echo "Updating JWT validation policy from JWT token"
-            export JWT_TRUST_TYPE="--token"
-            export JWT_TRUST_ARGS="${JWT_TOKEN}"
-          else
-            echo "Updating JWT validation policy with managed identity: $MANAGED_IDENTITY_RESOURCE_ID"
-            export JWT_TRUST_TYPE="--managed-identity"
-            export JWT_TRUST_ARGS="${MANAGED_IDENTITY_RESOURCE_ID}"
-          fi
+          set -euo pipefail
+          case "${TRUST_TYPE}" in
+            aad)
+              export JWT_TRUST_TYPE="--aad"
+              export JWT_TRUST_ARGS=""
+              ;;
+            token)
+              export JWT_TRUST_TYPE="--token"
+              export JWT_TRUST_ARGS="${JWT_TOKEN}"
+              ;;
+            managed-identity-v1)
+              if [ -n "${MANAGED_IDENTITY_RESOURCE_ID}" ]; then
+                export JWT_TRUST_TYPE="--managed-identity-v1"
+                export JWT_TRUST_ARGS="${MANAGED_IDENTITY_RESOURCE_ID}"
+              else
+                export JWT_TRUST_TYPE="--managed-identity-by-ids-v1"
+                export JWT_TRUST_ARGS="${MI_TENANT_ID} ${MI_PRINCIPAL_ID}"
+              fi
+              ;;
+            managed-identity|*)
+              if [ -n "${MANAGED_IDENTITY_RESOURCE_ID}" ]; then
+                export JWT_TRUST_TYPE="--managed-identity"
+                export JWT_TRUST_ARGS="${MANAGED_IDENTITY_RESOURCE_ID}"
+              else
+                export JWT_TRUST_TYPE="--managed-identity-by-ids"
+                export JWT_TRUST_ARGS="${MI_TENANT_ID} ${MI_PRINCIPAL_ID}"
+              fi
+              ;;
+          esac
           make jwt-issuer-trust
 
-      - name: Print updated JWT validation policy
-        env:
-          KMS_URL: ${{ env.KMS_URL }}
-          KMS_SERVICE_CERT_PATH: ${{ env.KMS_SERVICE_CERT_PATH }}
+      - name: Show JWT validation policy
         run: |
-          echo "=== Updated JWT Validation Policy ==="
-          echo ""
-          curl ${KMS_URL}/app/jwtValidationPolicy \
-            --cacert ${KMS_SERVICE_CERT_PATH} \
-            -H "Content-Type: application/json" \
-            -w '\n' | jq .
+          echo "=== Current JWT validation policy ==="
+          curl -sSf "${KMS_URL}/app/jwtValidationPolicy" \
+            --cacert "${KMS_SERVICE_CERT_PATH}" \
+            -H "Content-Type: application/json" | jq .
