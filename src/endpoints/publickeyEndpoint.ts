@@ -4,12 +4,11 @@
 import * as ccfapp from "@microsoft/ccf-app";
 import { ServiceResult } from "../utils/ServiceResult";
 import { ITinkPublicKeySet, TinkKey, TinkPublicKey } from "./TinkKey";
-import { hpkeKeyIdMap, hpkeKeysMap, keyRotationPolicyMap } from "../repositories/Maps";
+import { hpkeKeyIdMap, hpkeKeysMap } from "../repositories/Maps";
 import { IKeyItem } from "./IKeyItem";
 import { enableEndpoint, setKeyHeaders } from "../utils/Tooling";
 import { ServiceRequest } from "../utils/ServiceRequest";
 import { LogContext, Logger } from "../utils/Logger";
-import { KeyRotationPolicy } from "../policies/KeyRotationPolicy";
 
 // Enable the endpoint
 enableEndpoint();
@@ -27,15 +26,8 @@ export const listpubkeys = (
   if (isValidIdentity.failure) return isValidIdentity;
 
   try {
-    // Get latest key exposed for public-key clients (may lag by public_key_exposure_delay so private-key clients cache first)
-    const latestExposable = KeyRotationPolicy.getLatestExposableKey(
-      keyRotationPolicyMap,
-      hpkeKeyIdMap.size,
-      (id) => hpkeKeyIdMap.store.get(id),
-      (k) => hpkeKeysMap.store.get(k) as IKeyItem | undefined,
-      logContext
-    );
-    const kid = latestExposable ? latestExposable[1] : hpkeKeyIdMap.latestItem()[1];
+    // Get last key
+    const [_, kid] = hpkeKeyIdMap.latestItem();
     if (kid === undefined) {
       return ServiceResult.Failed<string>(
         {
@@ -86,18 +78,7 @@ export const pubkey = (
     if (serviceRequest.query && serviceRequest.query["kid"]) {
       kid = serviceRequest.query["kid"];
     } else {
-      const latestExposable = KeyRotationPolicy.getLatestExposableKey(
-        keyRotationPolicyMap,
-        hpkeKeyIdMap.size,
-        (idNum) => hpkeKeyIdMap.store.get(idNum),
-        (k) => hpkeKeysMap.store.get(k) as IKeyItem | undefined,
-        logContext
-      );
-      if (latestExposable) {
-        [id, kid] = latestExposable;
-      } else {
-        [id, kid] = hpkeKeyIdMap.latestItem();
-      }
+      [id, kid] = hpkeKeyIdMap.latestItem();
       if (kid === undefined) {
         return ServiceResult.Failed(
           {
