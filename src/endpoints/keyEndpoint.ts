@@ -104,6 +104,52 @@ const requestHasWrappingKey = (
 };
 
 //#region KMS Key endpoints
+
+// Mirror of the data-plane's ToOhttpKeyId(): interpret the first two
+// characters of the (stringified) KMS key id as hex and pack into one byte.
+// Exported for unit testing.
+export function toOhttpKeyId(kmsKeyId: number | string): number | undefined {
+  const s = String(kmsKeyId);
+  if (s.length < 2) return undefined;
+  const hi = parseInt(s[0], 16);
+  const lo = parseInt(s[1], 16);
+  if (Number.isNaN(hi) || Number.isNaN(lo)) return undefined;
+  return (hi << 4) | lo;
+}
+
+// Resolve the `kid` query param to a wrappedKid.
+//  - Non-numeric kid  -> assume it is already a wrappedKid (back-compat).
+//  - Numeric kid      -> treat as an OHTTP id; scan keys newest-first and
+//                        return the wrappedKid whose keyItem.id maps to it.
+// Returns undefined when a numeric id matches no stored key; the `key`
+// endpoint turns that into a 404. Exported for unit testing.
+export function resolveKidQueryParam(
+  kidParam: string,
+  logContext: LogContext,
+): string | undefined {
+  if (!/^\d+$/.test(kidParam)) {
+    return kidParam;
+  }
+
+  const requestedOhttpId = Number(kidParam);
+  for (let id = hpkeKeyIdMap.size; id >= 1; id--) {
+    const wrappedKid = hpkeKeyIdMap.store.get(id);
+    if (wrappedKid === undefined) continue;
+
+    const keyItem = hpkeKeysMap.store.get(wrappedKid) as IKeyItem | undefined;
+    if (keyItem === undefined || typeof keyItem.id !== "number") continue;
+
+    if (toOhttpKeyId(keyItem.id) === requestedOhttpId) {
+      Logger.debug(
+        `Resolved OHTTP kid ${kidParam} -> wrappedKid ${wrappedKid} (keyItem.id=${keyItem.id})`,
+        logContext,
+      );
+      return wrappedKid;
+    }
+  }
+  return undefined;
+}
+
 // Get latest private key
 export const key = (
   request: ccfapp.Request<IKeyRequest>,
@@ -136,6 +182,7 @@ export const key = (
   let kid = serviceRequest.query?.["kid"];
   let id: number | undefined;
   if (kid === undefined) {
+    // No kid requested: return the latest key (unchanged behavior).
     [id, kid] = hpkeKeyIdMap.latestItem();
     if (kid === undefined) {
       return ServiceResult.Failed<string>(
@@ -144,6 +191,18 @@ export const key = (
         logContext
       );
     }
+  } else {
+    // A kid was requested. It may be a numeric OHTTP id (from the data-plane's
+    // by-id private key fetch) or an explicit wrappedKid. Resolve it.
+    const resolvedKid = resolveKidQueryParam(String(kid), logContext);
+    if (resolvedKid === undefined) {
+      return ServiceResult.Failed<string>(
+        { errorMessage: `${name}: kid ${kid} not found in store` },
+        404,
+        logContext
+      );
+    }
+    kid = resolvedKid;
   }
 
   const fmt = serviceRequest.query?.["fmt"] || "jwk";
