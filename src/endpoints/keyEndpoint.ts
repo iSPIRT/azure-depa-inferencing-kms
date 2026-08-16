@@ -194,10 +194,53 @@ export const key = (
     return ServiceResult.Accepted(logContext);
   }
 
+  // When the caller did not ask for a specific kid and requests all keys
+  // (?all=true), return every currently-valid (non-expired) private key so a
+  // service can cache each key a client might still be using during a key
+  // rotation grace period. Only supported for the tink format used by services.
+  const listAll =
+    serviceRequest.query?.["all"] === "true" &&
+    serviceRequest.query?.["kid"] === undefined;
+  if (listAll && fmt !== "tink") {
+    return ServiceResult.Failed<string>(
+      { errorMessage: `${name}: all=true requires fmt=tink` },
+      400,
+      logContext
+    );
+  }
+
   // Get wrapped key
   try {
     let wrapped: string | IWrapped;
-    if (fmt == "tink") {
+    if (listAll) {
+      // Collect all non-expired keys, ordered oldest to newest.
+      const validKeyItems: IKeyItem[] = [];
+      for (let keyId = 1; keyId <= hpkeKeyIdMap.size; keyId++) {
+        const itemKid = hpkeKeyIdMap.store.get(keyId);
+        if (itemKid === undefined) continue;
+        const item = hpkeKeysMap.store.get(itemKid) as IKeyItem;
+        if (item === undefined) continue;
+        const [expired] = KeyRotationPolicy.isExpired(
+          keyRotationPolicyMap,
+          item,
+          logContext
+        );
+        if (expired) continue;
+        validKeyItems.push(item);
+      }
+      if (validKeyItems.length === 0) {
+        return ServiceResult.Failed<string>(
+          { errorMessage: `${name}: No valid keys in store` },
+          404,
+          logContext
+        );
+      }
+      Logger.debug(
+        `Returning ${validKeyItems.length} valid key(s) for all=true request`,
+        logContext
+      );
+      wrapped = JSON.stringify(KeyWrapper.wrapKeysTink(undefined, validKeyItems));
+    } else if (fmt == "tink") {
       wrapped = KeyWrapper.wrapKeyTink(undefined, keyItem);
       wrapped = JSON.stringify(wrapped);
     } else {
