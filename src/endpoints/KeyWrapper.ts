@@ -162,11 +162,11 @@ export class KeyWrapper {
     return wrappedB64;
   };
 
-  // Create an EncryptionKey structure of a tink key
-  public static wrapKeyTink = (
+  // Build a single EncryptionKey structure for a tink key.
+  private static buildEncryptionKey = (
     wrappingKey: ArrayBuffer | undefined,
     payload: IKeyItem,
-  ): IWrapped => {
+  ): EncryptionKey => {
     const encryptionKey: EncryptionKey = {
       // The following id will be treated as keyId.
       // We need to figure out the exact format.
@@ -209,7 +209,32 @@ export class KeyWrapper {
       ],
     };
     Logger.debug(`Encryption public key: `, encryptionKey);
-    const ret: IWrapped = { keys: [encryptionKey] };
+    return encryptionKey;
+  };
+
+  // Create an EncryptionKey structure of a tink key
+  public static wrapKeyTink = (
+    wrappingKey: ArrayBuffer | undefined,
+    payload: IKeyItem,
+  ): IWrapped => {
+    const ret: IWrapped = {
+      keys: [KeyWrapper.buildEncryptionKey(wrappingKey, payload)],
+    };
+    return ret;
+  };
+
+  // Create an IWrapped structure containing multiple tink keys. Used to release
+  // the full set of currently-valid (non-expired) private keys in a single
+  // response so that services can cache every key a client might still be using.
+  public static wrapKeysTink = (
+    wrappingKey: ArrayBuffer | undefined,
+    payloads: IKeyItem[],
+  ): IWrapped => {
+    const ret: IWrapped = {
+      keys: payloads.map((payload) =>
+        KeyWrapper.buildEncryptionKey(wrappingKey, payload),
+      ),
+    };
     return ret;
   };
 

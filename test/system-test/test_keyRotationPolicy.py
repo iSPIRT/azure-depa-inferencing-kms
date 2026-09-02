@@ -255,6 +255,56 @@ def test_key_rotation_public_key_exposure_delay(setup_kms_session):
     )
 
 
+def test_key_all_returns_all_valid_keys(setup_kms_session):
+    """Verify /key?all=true returns every currently-valid (non-expired) private
+    key in the wrapped `keys` array, so a service launched during a rotation
+    grace period can cache each key a client might still be using."""
+    apply_settings_policy()
+    apply_key_release_policy()
+    # Long rotation interval so both keys created below stay valid (non-expired).
+    rotation_policy = {
+        "actions": [
+            {
+                "name": "set_key_rotation_policy",
+                "args": {
+                    "key_rotation_policy": {
+                        "rotation_interval_seconds": 3600,
+                        "grace_period_seconds": 5,
+                    }
+                },
+            }
+        ]
+    }
+    apply_key_rotation_policy(rotation_policy)
+
+    # Create two keys.
+    refresh()
+    refresh()
+
+    # Request all valid keys (fmt=tink is required for the keys[] format).
+    while True:
+        status_code, all_keys_resp = key(
+            attestation=get_test_attestation(),
+            wrapping_key=get_test_public_wrapping_key(),
+            fmt="tink",
+            all="true",
+        )
+        if status_code != 202:
+            break
+    assert status_code == 200
+
+    wrapped = json.loads(all_keys_resp["wrapped"])
+    assert "keys" in wrapped, f"Expected 'keys' array in wrapped, got {wrapped}"
+    # At least the two keys created above must be present.
+    assert len(wrapped["keys"]) >= 2, (
+        f"Expected >= 2 valid keys, got {len(wrapped['keys'])}"
+    )
+    # Each entry must be a well-formed encryption key with its own kid.
+    for entry in wrapped["keys"]:
+        assert entry["name"].startswith("encryptionKeys/")
+        assert entry["keyData"][0]["keyEncryptionKeyUri"].startswith("azu-kms://")
+
+
 if __name__ == "__main__":
     import pytest
 

@@ -20,6 +20,10 @@ key() {
                 params+=("fmt=$2")
                 shift 2
                 ;;
+            --all)
+                params+=("all=$2")
+                shift 2
+                ;;
             --attestation)
                 attestation="$2"
                 shift 2
