@@ -88,6 +88,28 @@
         }
       }
     },
+    "/keyRotationPolicy": {
+      "get": {
+        "js_module": "endpoints/keyRotationPolicyEndpoint.js",
+        "js_function": "keyRotationPolicy",
+        "forwarding_required": "sometimes",
+        "redirection_strategy": "none",
+        "authn_policies": [],
+        "mode": "readonly",
+        "openapi": {
+          "responses": {
+            "200": {
+              "description": "Key rotation policy",
+              "content": {
+                "application/json": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/settingsPolicy": {
       "get": {
         "js_module": "endpoints/settingsPolicyEndpoint.js",
