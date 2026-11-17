@@ -289,7 +289,7 @@ jwt-issuer-trust() {
     if [[ "$skip_gov_jwt_setup" == "true" ]]; then
         :
     elif [[ "$TEST_ENVIRONMENT" == "ccf/acl" ]]; then
-        ccf-member-add `az account show | jq -r '.id'` '["Reader"]'
+        ccf-member-add `az-current-principal-id` '["Reader"]'
     else
         if [[ -n "$CA_CERT_BUNDLE_NAME" ]]; then
             set_ca_cert_bundle

@@ -71,7 +71,7 @@ acl-up() {
             --resource-group $RESOURCE_GROUP \
             --location "CentralIndia" \
             --ledger-type "Public" \
-            --aad-based-security-principals "[{\"principal-id\":\"$(az account show --query id -o tsv)\", \"ledger-role-name\":\"Administrator\"}]" \
+            --aad-based-security-principals "[{\"principal-id\":\"$(az-current-principal-id)\", \"ledger-role-name\":\"Administrator\"}]" \
             --cert-based-security-principals "[{\"cert\":\"$(cat $KMS_MEMBER_CERT_PATH | tr -d '\n')\", \"ledger-role-name\":\"Administrator\"}, {\"cert\":\"$(cat $KMS_USER_CERT_PATH | tr -d '\n')\", \"ledger-role-name\":\"Reader\"}]"
     else
         echo "Ledger already exists, skipping deployment."
@@ -83,7 +83,7 @@ acl-up() {
     export KMS_SERVICE_CERT_PATH="$WORKSPACE/service_cert.pem"
 
     ccf-member-add \
-        $(az account show | jq -r '.id') '["Administrator"]'
+        $(az-current-principal-id) '["Administrator"]'
 
     ccf-member-add \
         $(cert-fingerprint $KMS_MEMBER_CERT_PATH) '["Administrator"]'
