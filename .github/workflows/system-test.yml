@@ -33,7 +33,7 @@ jobs:
   test:
     name: ${{ inputs.test_path }} (${{ inputs.env }}, ${{ inputs.use_akv && 'akv' || 'local' }}_keys)
     runs-on: ubuntu-latest
-    environment: UAT
+    environment: CI
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -51,6 +51,16 @@ ccf-member-add-gov() {
     )
 }
 
+# Object ID of the identity az is logged in as (user, service principal or
+# managed identity), read from the access token so no Graph permissions are needed
+az-current-principal-id() {
+    az account get-access-token \
+        --resource https://confidential-ledger.azure.com \
+        --query accessToken -o tsv \
+        | cut -d. -f2 \
+        | jq -Rr 'gsub("-";"+") | gsub("_";"/") | @base64d | fromjson | .oid'
+}
+
 # Uses the ACL Endpoint to add a new member to the network
 ccf-member-add-acl() {
     local member_id=$1

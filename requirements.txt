@@ -2,5 +2,6 @@ ccf==6.0.2
 pytest==8.3.5
 pycryptodome==3.22.0
 cose==0.9.dev8
+cbor2<6 # cose 0.9.dev8 rejects the tuples cbor2>=6 decodes arrays into
 pre-commit==3.3.3
 detect-secrets==1.4.0

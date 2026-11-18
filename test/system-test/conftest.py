@@ -119,6 +119,8 @@ def _setup_ccf():
                     },
                 )
             except Exception: ...
+    else:
+        raise RuntimeError(f"Failed to set up {TEST_ENVIRONMENT} after 10 attempts")
 
     yield
 
